@@ -1,0 +1,1847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Device Mockup Generator</title>
+<meta name="description" content="Drop a recording or screenshot into a device frame and export it as video or PNG. Runs entirely in your browser.">
+<!-- Inline so the page stays a single self-contained file and never requests /favicon.ico -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231A1B1F'/%3E%3Crect x='7' y='9' width='18' height='12' rx='2' fill='%2315FFB9'/%3E%3Crect x='13' y='23' width='6' height='2' rx='1' fill='%2315FFB9'/%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light;
+    --bg:#fff; --panel:#fafafa; --border:#e5e5e5; --border-strong:#d4d4d4;
+    --text:#18181b; --muted:#71717a; --accent:#2563eb; --accent-hover:#1d4ed8;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  .app{display:flex;gap:20px;align-items:flex-start;padding:20px;min-height:100vh}
+  @media (max-width:920px){.app{flex-direction:column}.panel{width:100%!important}}
+  .panel{width:316px;flex:0 0 auto;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px}
+  .panel h1{font-size:15px;margin:0 0 2px;letter-spacing:-.01em}
+  .panel .sub{color:var(--muted);font-size:12px;margin:0 0 16px}
+  .group{margin-bottom:15px}
+  .group>label:not(.check),.glabel{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px}
+  select,input[type=text],input[type=number]{width:100%;padding:7px 9px;font:inherit;font-size:13px;border:1px solid var(--border-strong);border-radius:8px;background:#fff;color:var(--text)}
+  input[type=range]{width:100%;accent-color:var(--accent)}
+  .row{display:flex;align-items:center;gap:8px}
+  .row+.row{margin-top:8px}
+  .rlab{font-size:12px;width:62px;color:var(--muted);flex:0 0 auto}
+  .val{font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted);min-width:42px;text-align:right}
+  .check{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+  .check input{accent-color:var(--accent);width:15px;height:15px}
+  button{font:inherit;cursor:pointer;border-radius:9px;border:1px solid var(--border-strong);background:#fff;color:var(--text);padding:8px 12px;font-size:13px;transition:background .12s,border-color .12s,opacity .12s}
+  button:hover:not(:disabled){background:#f4f4f5}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;width:100%;padding:11px;font-size:14px;font-weight:600}
+  .btn-primary:hover:not(:disabled){background:var(--accent-hover);border-color:var(--accent-hover)}
+  .btn-danger{background:#dc2626;border-color:#dc2626;color:#fff;width:100%;padding:11px;font-weight:600}
+  .btn-file{display:block;width:100%;text-align:center;padding:11px;font-weight:600;border:1px dashed var(--border-strong);background:#fff;border-radius:9px}
+  .btn-file:hover{border-color:var(--accent);color:var(--accent)}
+  .swatches{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .sw{width:26px;height:26px;border-radius:7px;border:1px solid rgba(0,0,0,.15);cursor:pointer;padding:0}
+  .sw[aria-pressed=true]{box-shadow:0 0 0 2px var(--accent)}
+  input[type=color]{width:34px;height:26px;padding:0;border:1px solid var(--border-strong);border-radius:7px;background:#fff;cursor:pointer}
+  hr{border:0;border-top:1px solid var(--border);margin:15px 0}
+  .status{font-size:12px;color:var(--muted);margin-top:8px;min-height:16px}
+  .status.err{color:#dc2626}
+  .bar{height:5px;background:var(--border);border-radius:99px;overflow:hidden;margin-top:8px;display:none}
+  .bar>div{height:100%;width:0%;background:var(--accent);transition:width .1s linear}
+  .stage{flex:1 1 auto;min-width:0}
+  .stage-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;gap:12px}
+  .stage-head .t{font-size:13px;font-weight:600}
+  .stage-head .m{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .canvas-wrap{position:relative;border:1px solid var(--border);border-radius:14px;padding:14px;min-height:240px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(45deg,#f4f4f5 25%,transparent 25%,transparent 75%,#f4f4f5 75%) 0 0/16px 16px,
+               linear-gradient(45deg,#f4f4f5 25%,transparent 25%,transparent 75%,#f4f4f5 75%) 8px 8px/16px 16px,#fff}
+  .canvas-wrap.drag{border-color:var(--accent);background:#eff6ff}
+  canvas{max-width:100%;max-height:64vh;display:block;touch-action:none}
+  .playbar{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .playbar input[type=range]{flex:1;min-width:120px}
+  .modes{display:flex;gap:3px;background:#f0f0f1;border:1px solid var(--border);border-radius:10px;padding:3px;margin:0 0 16px}
+  .modes button{flex:1;border:0;background:transparent;padding:7px 8px;font-size:12.5px;font-weight:600;color:var(--muted);border-radius:7px}
+  .modes button[aria-pressed=true]{background:#fff;color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .modes button:hover:not([aria-pressed=true]){background:rgba(0,0,0,.045)}
+  /* ---- collapsible panel sections ---- */
+  details.sec{border-top:1px solid var(--border);padding:11px 0 3px}
+  details.sec:first-of-type{border-top:0}
+  details.sec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;
+    font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:3px 0;margin-bottom:9px}
+  details.sec>summary::-webkit-details-marker{display:none}
+  details.sec>summary::after{content:"";width:6px;height:6px;margin-right:3px;border-right:1.5px solid currentColor;
+    border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+  details.sec[open]>summary::after{transform:rotate(45deg)}
+  details.sec>summary:hover{color:var(--text)}
+  details.sec>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+  .panel.quick details.sec>summary{pointer-events:none}
+  .panel.quick details.sec>summary::after{display:none}
+  .sec .group:last-child{margin-bottom:4px}
+  /* ---- output-size presets ---- */
+  .chips{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .chip{display:block;text-align:left;padding:8px 10px;border:1px solid var(--border-strong);border-radius:9px;
+    background:#fff;font-size:12.5px;font-weight:600;line-height:1.3}
+  .chip small{display:block;font-weight:500;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .chip[aria-pressed=true]{border-color:var(--accent);background:#eff6ff;color:var(--accent)}
+  .chip[aria-pressed=true] small{color:var(--accent)}
+  /* ---- empty state over the canvas ---- */
+  /* Full-bleed so the whole preview reads as the drop target, but translucent —
+     the device frame behind it is a preview of what you are about to get. */
+  .empty{position:absolute;inset:14px;display:flex;align-items:center;justify-content:center;
+    border:2px dashed var(--border-strong);border-radius:10px;background:rgba(255,255,255,.55);text-align:center;padding:22px}
+  .empty-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px 20px;
+    box-shadow:0 6px 22px rgba(0,0,0,.10);max-width:38ch}
+  .empty h2{margin:0 0 5px;font-size:15px;letter-spacing:-.01em}
+  .empty p{margin:0;font-size:12.5px;color:var(--muted)}
+  .canvas-wrap.drag .empty{border-color:var(--accent);background:rgba(239,246,255,.72)}
+  .linkbtn{border:0;background:none;padding:0;font:inherit;color:var(--accent);font-weight:600;text-decoration:underline}
+  .linkbtn:hover{background:none}
+  /* ---- unified timeline: playhead and both trim handles on one track ---- */
+  .tl{position:relative;height:30px;flex:1;min-width:170px;touch-action:none;user-select:none;-webkit-user-select:none}
+  .tl[aria-disabled=true]{opacity:.4;pointer-events:none}
+  .tl[aria-disabled=true] .tl-h,.tl[aria-disabled=true] .tl-play,
+  .tl[aria-disabled=true] .tl-sel,.tl[aria-disabled=true] .tl-prog{display:none}
+  .tl-track{position:absolute;left:0;right:0;top:12px;height:6px;border-radius:99px;background:var(--border-strong)}
+  .tl-sel{position:absolute;top:12px;height:6px;background:rgba(37,99,235,.22)}
+  .tl-prog{position:absolute;top:12px;height:6px;background:var(--accent);border-radius:99px}
+  .tl-h{position:absolute;top:4px;width:14px;height:22px;margin-left:-7px;border-radius:4px;background:#fff;
+    border:1px solid var(--border-strong);box-shadow:0 1px 3px rgba(0,0,0,.24);cursor:ew-resize}
+  .tl-h::after{content:"";position:absolute;left:4px;top:6px;width:2px;height:9px;border-left:1px solid var(--border-strong);
+    border-right:1px solid var(--border-strong)}
+  .tl-h:focus-visible{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.3)}
+  .tl-play{position:absolute;top:2px;width:2px;height:26px;margin-left:-1px;border-radius:2px;background:var(--text);pointer-events:none}
+  .trimbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:9px;flex-wrap:wrap}
+  .trimbar .m{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .trimbtns{display:flex;gap:6px}
+  .trimbtns button{font-size:12px;padding:5px 9px}
+  .est{font-size:12px;color:var(--muted);margin-top:7px;text-align:center}
+  .hint{font-size:12px;color:var(--muted);margin-top:10px}
+  .result{margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--panel);display:none}
+  .result h3{margin:0 0 6px;font-size:13px}
+  .result video{width:100%;max-height:34vh;border-radius:8px;background:#000;margin-top:8px}
+  /* a transparent clip previewed on black looks exactly like a failed export —
+     show it on the same checkerboard the canvas uses */
+  .result video.alpha{background:
+    linear-gradient(45deg,#dcdcdf 25%,transparent 25%,transparent 75%,#dcdcdf 75%) 0 0/16px 16px,
+    linear-gradient(45deg,#dcdcdf 25%,transparent 25%,transparent 75%,#dcdcdf 75%) 8px 8px/16px 16px,#fff}
+  .result a{color:var(--accent);font-weight:600}
+  #srcVideo{position:absolute;left:0;top:0;width:2px;height:2px;opacity:.01;pointer-events:none;z-index:-1}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="panel" id="panel">
+    <h1>Device Mockup Generator</h1>
+    <p class="sub">Drop a recording or screenshot into a device, then export it.</p>
+
+    <div class="modes" id="modes" role="group" aria-label="Editing mode">
+      <button type="button" id="modeQuick" aria-pressed="true">Quick</button>
+      <button type="button" id="modeFull" aria-pressed="false">Full control</button>
+    </div>
+
+    <details class="sec" id="secContent" open>
+      <summary>Content</summary>
+      <input id="file" type="file" accept="video/*,image/*" hidden>
+      <button class="btn-file" id="pick">Choose video or image&hellip;</button>
+      <div class="status" id="fileInfo">Nothing loaded &mdash; files stay in your browser.</div>
+    </details>
+
+    <details class="sec" id="secDevice" open>
+      <summary>Device</summary>
+    <div class="group">
+      <select id="device" aria-label="Device">
+        <option value="imac24" selected>All-in-one &mdash; slim, slab stand</option>
+        <option value="imac27">All-in-one &mdash; black bezel, tapered neck</option>
+        <option value="studio">Display &mdash; thin bezel + plate stand</option>
+        <option value="monitor">Monitor &mdash; column + wide base</option>
+        <option value="laptop">Laptop</option>
+        <option value="window">Bare macOS window</option>
+        <option value="photo">Photo of a real device&hellip;</option>
+      </select>
+    </div>
+
+    <div class="group" id="photoGroup" style="display:none">
+      <label for="photoFile">Device photo</label>
+      <input id="photoFile" type="file" accept="image/*" hidden>
+      <button class="btn-file" id="pickPhoto">Choose device photo&hellip;</button>
+      <div class="status" id="photoInfo">Use a straight-on product shot. Drag the four handles onto the screen corners.</div>
+      <div class="row" style="margin-top:8px"><button id="resetQuad" style="flex:1">Reset corners</button></div>
+      <div class="row"><label class="check"><input type="checkbox" id="screenShade" checked> Blend content into the screen</label></div>
+    </div>
+
+    <div class="group" id="finishGroup" data-adv>
+      <label for="finish">Device colour</label>
+      <select id="finish">
+        <option value="silver" selected>Silver</option>
+        <option value="black">Black</option>
+        <option value="graphite">Space grey</option>
+        <option value="starlight">Starlight</option>
+      </select>
+    </div>
+
+    <div class="group" id="shapeGroup" data-adv>
+      <label for="screenAr">Screen shape</label>
+      <select id="screenAr">
+        <option value="source" selected>Wrap to my file's aspect ratio</option>
+        <option value="1.7778">Standard 16:9</option>
+        <option value="1.6">Standard 16:10</option>
+        <option value="1.5">Standard 3:2</option>
+        <option value="1.3333">Standard 4:3</option>
+        <option value="2.3333">Ultrawide 21:9</option>
+      </select>
+    </div>
+    </details>
+
+    <details class="sec" id="secScene" open>
+      <summary>Scene</summary>
+
+    <div class="group">
+      <span class="glabel">Where&rsquo;s this going?</span>
+      <div class="chips" id="outputChips"></div>
+    </div>
+
+    <div class="group" id="presetGroup" data-adv>
+      <label for="preset">Exact canvas size</label>
+      <select id="preset">
+        <option value="1920x1080" selected>1920 &times; 1080 &mdash; 16:9</option>
+        <option value="1280x720">1280 &times; 720 &mdash; 16:9 (lighter)</option>
+        <option value="1920x1200">1920 &times; 1200 &mdash; 16:10</option>
+        <option value="1080x1080">1080 &times; 1080 &mdash; square</option>
+        <option value="1080x1350">1080 &times; 1350 &mdash; 4:5</option>
+        <option value="1080x1920">1080 &times; 1920 &mdash; 9:16</option>
+      </select>
+    </div>
+
+    <div class="group">
+      <span class="glabel">Background</span>
+      <div class="swatches" id="swatches"></div>
+      <div class="row" style="margin-top:8px">
+        <input type="color" id="bgColor" value="#f5f5f7">
+        <span class="val" id="bgHex" style="min-width:0">#f5f5f7</span>
+      </div>
+      <div class="row" style="margin-top:8px"><label class="check"><input type="checkbox" id="transparent"> Transparent / no fill</label></div>
+      <div class="status" id="bgNote" style="display:none">Transparency survives PNG export. Video formats have no alpha, so clips fall back to black.</div>
+    </div>
+
+    <div class="group" id="framingGroup" data-adv>
+      <span class="glabel">Framing</span>
+      <div class="row"><span class="rlab">Margin</span><input type="range" id="padding" min="0" max="22" step="0.5" value="6"><span class="val" id="paddingV">6%</span></div>
+      <div class="row"><span class="rlab">Shadow</span><input type="range" id="shadow" min="0" max="100" step="1" value="55"><span class="val" id="shadowV">55</span></div>
+      <div class="row" id="radiusRow" style="display:none"><span class="rlab">Corners</span><input type="range" id="radius" min="0" max="34" step="1" value="14"><span class="val" id="radiusV">14</span></div>
+      <div class="row" id="themeRow" style="display:none"><select id="theme" style="flex:1"><option value="light" selected>Light title bar</option><option value="dark">Dark title bar</option></select></div>
+      <div class="row" id="titleRow" style="display:none"><input type="text" id="title" placeholder="Window title (optional)"></div>
+      <div class="row" id="notchRow" style="margin-top:10px;display:none"><label class="check"><input type="checkbox" id="notch" checked> Camera notch</label></div>
+      <div class="row"><label class="check"><input type="checkbox" id="fitCover"> Crop content to fill screen</label></div>
+      <div class="row"><label class="check"><input type="checkbox" id="reflect"> Screen glare</label></div>
+      <div class="row"><label class="check"><input type="checkbox" id="backdrop" checked> Studio backdrop</label></div>
+      <div class="row"><label class="check"><input type="checkbox" id="grain" checked> Photographic grain</label></div>
+    </div>
+    </details>
+
+    <details class="sec" id="secExport" open>
+      <summary>Export</summary>
+    <div class="group">
+      <div class="row" style="margin-bottom:8px" id="fpsRow" data-adv>
+        <select id="fps" style="flex:1"><option value="30" selected>30 fps</option><option value="60">60 fps</option><option value="24">24 fps</option></select>
+      </div>
+      <div class="row" id="stillRow" style="display:none;margin-bottom:8px">
+        <span class="rlab">Length</span><input type="number" id="stillSecs" min="1" max="60" step="1" value="5"><span class="val" style="min-width:0">sec</span>
+      </div>
+      <label class="check" style="margin-bottom:10px"><input type="checkbox" id="withAudio" checked> Include audio</label>
+      <button class="btn-primary" id="export" disabled>Export as MP4</button>
+      <button class="btn-danger" id="stop" style="display:none">Stop &amp; save now</button>
+      <div class="est" id="est"></div>
+      <div class="bar" id="bar"><div></div></div>
+      <div class="status" id="status"></div>
+      <button id="png" disabled style="width:100%;margin-top:10px">Save current frame as PNG</button>
+    </div>
+    </details>
+  </aside>
+
+  <main class="stage">
+    <div class="stage-head"><span class="t">Preview</span><span class="m" id="meta"></span></div>
+    <div class="canvas-wrap" id="wrap">
+      <canvas id="canvas" width="1920" height="1080"></canvas>
+      <div class="empty" id="empty">
+        <div class="empty-card">
+          <h2>Drop a recording or screenshot here</h2>
+          <p>Or <button type="button" class="linkbtn" id="pick2">browse for a file</button>. Nothing is uploaded &mdash; it all stays in your browser.</p>
+        </div>
+      </div>
+    </div>
+    <div class="playbar">
+      <button id="play" disabled>Play</button>
+      <button id="restart" disabled>Restart</button>
+      <div class="tl" id="tl" aria-disabled="true">
+        <div class="tl-track"></div>
+        <div class="tl-sel" id="tlSel"></div>
+        <div class="tl-prog" id="tlProg"></div>
+        <div class="tl-h" id="tlA" tabindex="0" role="slider" aria-label="Clip start" aria-valuemin="0" aria-valuenow="0"></div>
+        <div class="tl-h" id="tlB" tabindex="0" role="slider" aria-label="Clip end" aria-valuemin="0" aria-valuenow="0"></div>
+        <div class="tl-play" id="tlPlay"></div>
+      </div>
+      <span class="val" id="time" style="min-width:88px">0:00 / 0:00</span>
+      <label class="check"><input type="checkbox" id="loop" checked> Loop</label>
+    </div>
+    <div class="trimbar" id="trimBar" style="display:none">
+      <span class="m" id="trimReadout">0:00.0 &rarr; 0:00.0 &middot; 0.0s</span>
+      <div class="trimbtns">
+        <button type="button" id="trimSetA">Start here</button>
+        <button type="button" id="trimSetB">End here</button>
+        <button type="button" id="trimReset">Whole clip</button>
+      </div>
+    </div>
+    <p class="hint">Drag the handles on the timeline to trim. Video exports record the canvas in real time, so they take as long as the trimmed clip.</p>
+    <div class="result" id="result">
+      <h3>Export complete</h3>
+      <div id="resultMeta" style="font-size:12px;color:var(--muted)"></div>
+      <div style="margin-top:8px"><a id="dl" download>Download again</a> &nbsp;&middot;&nbsp; <span style="font-size:12px;color:var(--muted)">or right-click the video and &ldquo;Save video as&hellip;&rdquo;</span></div>
+      <video id="resultVideo" controls playsinline></video>
+    </div>
+  </main>
+</div>
+
+<video id="srcVideo" playsinline muted></video>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var canvas = $("canvas");
+  var ctx = canvas.getContext("2d", { alpha: true });
+  var video = $("srcVideo");
+  var image = new Image();
+  var devicePhoto = new Image();
+
+  var src = { kind: null, ar: 16 / 9 };
+  var photo = { loaded: false, quad: null };
+
+  var state = {
+    device: "imac24", finish: "silver", screenAr: "source", transparent: false,
+    bg: "#f5f5f7", padding: 6, shadow: 55, radius: 14,
+    theme: "light", title: "", cover: false, reflect: false, grain: true, backdrop: true,
+    notch: true, screenShade: true, recording: false, exporting: false,
+    mode: "quick", trimStart: 0, trimEnd: 0
+  };
+
+  /* ================= finishes ================= */
+  // alu = [outer edge, specular, upper mid, lower mid, far edge]
+  var FINISH = {
+    silver:    { body: ["#eaeaef", "#d9d9df", "#bcbcc5"], lip: "#ffffff", edge: "rgba(0,0,0,0.20)",
+                 alu: ["#8e8e97", "#f2f2f5", "#dcdce2", "#b9b9c1", "#84848d"], dark: false },
+    black:     { body: ["#3a3a3e", "#212124", "#0e0e10"], lip: "#5c5c62", edge: "rgba(0,0,0,0.72)",
+                 alu: ["#0d0d0f", "#57575f", "#34343a", "#212126", "#0b0b0d"], dark: true },
+    graphite:  { body: ["#66666c", "#4a4a50", "#303037"], lip: "#8b8b93", edge: "rgba(0,0,0,0.52)",
+                 alu: ["#303036", "#86868f", "#585860", "#3f3f46", "#26262b"], dark: true },
+    starlight: { body: ["#f6efe4", "#e9ddca", "#d5c4ad"], lip: "#fffdfa", edge: "rgba(80,60,40,0.26)",
+                 alu: ["#b3a48f", "#faf5ec", "#ece0cf", "#d4c3ab", "#a1917b"], dark: false }
+  };
+
+  var PANEL = {
+    studio:  { side: 0.0185, top: 0.0185, chin: 0.0185, bodyR: 0.020, edgeF: 0.0016, bezel: "black", chinCol: "black", camera: true,  buttons: false, standF: 0.255, stand: "plate" },
+    imac27:  { side: 0.049,  top: 0.039,  chin: 0.143,  bodyR: 0.013, edgeF: 0.0016, bezel: "black", chinCol: "body",  camera: true,  buttons: false, standF: 0.190, stand: "neckfoot" },
+    imac24:  { side: 0.026,  top: 0.030,  chin: 0.112,  bodyR: 0.017, edgeF: 0.0018, bezel: "body",  chinCol: "body",  camera: true,  buttons: false, standF: 0.275, stand: "slab" },
+    monitor: { side: 0.0115, top: 0.0115, chin: 0.042,  bodyR: 0.008, edgeF: 0.0013, bezel: "black", chinCol: "black", camera: false, buttons: true,  standF: 0.395, stand: "column" }
+  };
+  var LAPTOP = { side: 0.0148, top: 0.0255, bottom: 0.0300, baseF: 0.045, flare: 1.062, lidR: 0.020 };
+  var WINDOW_BAR = 0.040;
+
+  /* ================= textures ================= */
+
+  function makeTile(draw, w, h) {
+    var c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    draw(c.getContext("2d"), w, h);
+    return c;
+  }
+  // fine bead-blasted metal speckle
+  var brushTile = makeTile(function (c, w, h) {
+    var d = c.createImageData(w, h), p = d.data;
+    for (var i = 0; i < p.length; i += 4) {
+      var v = 128 + (Math.random() - 0.5) * 42;
+      p[i] = p[i + 1] = p[i + 2] = v; p[i + 3] = 255;
+    }
+    c.putImageData(d, 0, 0);
+  }, 128, 128);
+  // camera grain
+  var grainTile = makeTile(function (c, w, h) {
+    var d = c.createImageData(w, h), p = d.data;
+    for (var i = 0; i < p.length; i += 4) {
+      var v = 128 + (Math.random() - 0.5) * 70;
+      p[i] = p[i + 1] = p[i + 2] = v; p[i + 3] = 255;
+    }
+    c.putImageData(d, 0, 0);
+  }, 160, 160);
+  var brushPat = null, grainPat = null;
+
+  /* ================= helpers ================= */
+
+  function roundPath(c, x, y, w, h, tl, tr, br, bl) {
+    var mn = Math.min(w, h) / 2;
+    tl = Math.max(0, Math.min(tl, mn)); tr = Math.max(0, Math.min(tr, mn));
+    br = Math.max(0, Math.min(br, mn)); bl = Math.max(0, Math.min(bl, mn));
+    c.beginPath();
+    c.moveTo(x + tl, y);
+    c.lineTo(x + w - tr, y); c.quadraticCurveTo(x + w, y, x + w, y + tr);
+    c.lineTo(x + w, y + h - br); c.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
+    c.lineTo(x + bl, y + h); c.quadraticCurveTo(x, y + h, x, y + h - bl);
+    c.lineTo(x, y + tl); c.quadraticCurveTo(x, y, x + tl, y);
+    c.closePath();
+  }
+  function vGrad(x, y, h, stops) {
+    var g = ctx.createLinearGradient(x, y, x, y + h);
+    for (var i = 0; i < stops.length; i++) g.addColorStop(i / (stops.length - 1), stops[i]);
+    return g;
+  }
+  function hGrad(x, y, w, stops) {
+    var g = ctx.createLinearGradient(x, y, x + w, y);
+    for (var i = 0; i < stops.length; i++) g.addColorStop(i / (stops.length - 1), stops[i]);
+    return g;
+  }
+  // Anodised aluminium under a softbox key (upper left) with a weak fill on the right.
+  // The specular band is deliberately narrow — a wide one reads as white plastic.
+  function metal(x, w, f) {
+    var g = ctx.createLinearGradient(x, 0, x + w, 0);
+    g.addColorStop(0.00, f.alu[4]);   // grazing edge, darkest
+    g.addColorStop(0.04, f.alu[0]);
+    g.addColorStop(0.15, f.alu[2]);
+    g.addColorStop(0.235, f.alu[1]);  // specular
+    g.addColorStop(0.33, f.alu[2]);
+    g.addColorStop(0.62, f.alu[3]);
+    g.addColorStop(0.86, f.alu[2]);   // fill-light bounce
+    g.addColorStop(1.00, f.alu[4]);
+    return g;
+  }
+  // fills the current path with metal, then lays a faint material speckle over it
+  function fillMetal(pathFn, x, w, f) {
+    pathFn(); ctx.fillStyle = metal(x, w, f); ctx.fill();
+    if (!brushPat) brushPat = ctx.createPattern(brushTile, "repeat");
+    ctx.save(); pathFn(); ctx.clip();
+    ctx.globalAlpha = 0.055; ctx.globalCompositeOperation = "overlay";
+    ctx.fillStyle = brushPat; ctx.fillRect(x - 4, -4000, w + 8, 8000);
+    ctx.restore();
+  }
+  function softShadow(pathFn, blur, dy, alpha) {
+    var s = state.shadow / 100;
+    if (s <= 0) return;
+    ctx.save();
+    if (typeof ctx.filter === "string") ctx.filter = "blur(" + Math.max(1, blur * s) + "px)";
+    ctx.globalAlpha = alpha * s;
+    ctx.fillStyle = "#0d1016";
+    ctx.translate(0, dy * s);
+    pathFn(); ctx.fill();
+    ctx.restore();
+  }
+  // one soft ellipse of shadow; `contactShadow` stacks two of these
+  function shadowEllipse(cx, y, w, h, stops) {
+    var g = ctx.createRadialGradient(cx, y, 0, cx, y, w / 2);
+    for (var i = 0; i < stops.length; i++) g.addColorStop(stops[i][0], stops[i][1]);
+    ctx.save();
+    ctx.translate(cx, y); ctx.scale(1, h / (w / 2)); ctx.translate(-cx, -y);
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, y, w / 2, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  // Two layers: a wide ambient pool plus a tight, much darker core right under the
+  // footprint. The core is what actually reads as "sitting on a surface".
+  function contactShadow(cx, y, w, h) {
+    var s = state.shadow / 100;
+    if (s <= 0) return;
+    shadowEllipse(cx, y, w * 1.10, h * 1.25, [
+      [0, "rgba(10,12,18," + (0.20 * s).toFixed(3) + ")"],
+      [0.5, "rgba(10,12,18," + (0.085 * s).toFixed(3) + ")"],
+      [1, "rgba(10,12,18,0)"]
+    ]);
+    shadowEllipse(cx, y, w * 0.46, h * 0.42, [
+      [0, "rgba(8,10,15," + (0.44 * s).toFixed(3) + ")"],
+      [0.45, "rgba(8,10,15," + (0.26 * s).toFixed(3) + ")"],
+      [1, "rgba(8,10,15,0)"]
+    ]);
+  }
+  // Cylindrical form for necks and columns. These are round in section, so their
+  // edges roll away from the key light — without this they read as flat white card.
+  // Safe to layer over the shared stand gradient: necks are always painted before
+  // the foot that overlaps them, so the bottom seam is covered.
+  function cylinderShade(pathFn, x, w, top, h) {
+    ctx.save(); pathFn(); ctx.clip();
+    var g = ctx.createLinearGradient(x, 0, x + w, 0);
+    g.addColorStop(0.00, "rgba(0,0,0,0.30)");
+    g.addColorStop(0.15, "rgba(0,0,0,0.04)");
+    g.addColorStop(0.29, "rgba(255,255,255,0.13)");
+    g.addColorStop(0.45, "rgba(255,255,255,0.01)");
+    g.addColorStop(0.70, "rgba(0,0,0,0.13)");
+    g.addColorStop(0.88, "rgba(0,0,0,0.06)");
+    g.addColorStop(1.00, "rgba(0,0,0,0.34)");
+    ctx.fillStyle = g; ctx.fillRect(x, top, w, h);
+    ctx.restore();
+  }
+  // ambient occlusion rising from `bottom` — for where a part sinks into another
+  function aoUp(cx, bottom, w, h, a) {
+    ctx.fillStyle = vGrad(cx, bottom - h, h, ["rgba(0,0,0,0)", "rgba(0,0,0," + (a * 0.3).toFixed(3) + ")", "rgba(0,0,0," + a.toFixed(3) + ")"]);
+    ctx.fillRect(cx - w / 2, bottom - h, w, h);
+  }
+  function neckShadow(cx, top, w, h) {
+    ctx.fillStyle = vGrad(cx, top, h, ["rgba(0,0,0,0.36)", "rgba(0,0,0,0.10)", "rgba(0,0,0,0)"]);
+    ctx.fillRect(cx - w / 2, top, w, h);
+  }
+  function seatShadow(cx, y, w, h) {
+    var g = ctx.createRadialGradient(cx, y, 0, cx, y, w / 2);
+    g.addColorStop(0, "rgba(0,0,0,0.24)"); g.addColorStop(0.5, "rgba(0,0,0,0.07)"); g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g; ctx.fillRect(cx - w / 2, y - h * 0.2, w, h);
+  }
+
+  /* ================= layout ================= */
+
+  function screenAR() {
+    if (state.screenAr === "source") return src.ar || 16 / 9;
+    return parseFloat(state.screenAr) || 16 / 9;
+  }
+  function metrics() {
+    var ar = screenAR(), d = state.device;
+    if (d === "window") return { kw: 1, kh: 1 / ar + WINDOW_BAR };
+    if (d === "laptop") {
+      var lidHF = 1 / ar + LAPTOP.top + LAPTOP.bottom;
+      return { kw: (1 + LAPTOP.side * 2) * LAPTOP.flare, kh: lidHF * (1 + LAPTOP.baseF), lidHF: lidHF };
+    }
+    var p = PANEL[d] || PANEL.imac24;
+    var dispHF = 1 / ar + p.top + p.chin;
+    return { kw: 1 + p.side * 2, kh: dispHF * (1 + p.standF), dispHF: dispHF, p: p };
+  }
+  function layout() {
+    var W = canvas.width, H = canvas.height, pad = state.padding / 100;
+    var m = metrics();
+    var sw = Math.min(W * (1 - pad * 2) / m.kw, H * (1 - pad * 2) / m.kh);
+    return { m: m, sw: sw, sh: sw / screenAR(), cx: W / 2, top: (H - sw * m.kh) / 2 };
+  }
+
+  /* ================= screen content ================= */
+
+  function mediaEl() {
+    if (src.kind === "video") return (video.readyState >= 2 && video.videoWidth) ? video : null;
+    if (src.kind === "image") return (image.complete && image.naturalWidth) ? image : null;
+    return null;
+  }
+
+  function drawScreen(x, y, w, h, r) {
+    ctx.save();
+    roundPath(ctx, x, y, w, h, r, r, r, r);
+    ctx.clip();
+    ctx.fillStyle = "#0a0a0d"; ctx.fillRect(x, y, w, h);
+
+    var el = mediaEl();
+    if (el) {
+      var vw = el.videoWidth || el.naturalWidth, vh = el.videoHeight || el.naturalHeight;
+      var s = state.cover ? Math.max(w / vw, h / vh) : Math.min(w / vw, h / vh);
+      ctx.drawImage(el, x + (w - vw * s) / 2, y + (h - vh * s) / 2, vw * s, vh * s);
+    } else if (src.kind) {
+      // A source is loaded but has no decodable frame this instant — mid-seek, or
+      // still buffering. Show an empty panel, never the invitation to pick a file:
+      // that prompt used to land on the first frame of an export.
+      ctx.fillStyle = "#0e0e12"; ctx.fillRect(x, y, w, h);
+    } else {
+      // Nothing loaded yet. The invitation to drop a file lives in the HTML empty
+      // state over the canvas, so the screen here is just an unlit panel.
+      ctx.fillStyle = "#141419"; ctx.fillRect(x, y, w, h);
+    }
+
+    // LCD corner falloff — real panels are never evenly lit
+    var vg2 = ctx.createRadialGradient(x + w / 2, y + h / 2, Math.min(w, h) * 0.25,
+                                       x + w / 2, y + h / 2, Math.max(w, h) * 0.72);
+    vg2.addColorStop(0, "rgba(0,0,0,0)");
+    vg2.addColorStop(1, "rgba(0,0,0,0.11)");
+    ctx.fillStyle = vg2; ctx.fillRect(x, y, w, h);
+
+    if (state.reflect) {
+      // softbox raking across the glass: a bright leading edge, then a long falloff
+      var g = ctx.createLinearGradient(x, y, x + w * 0.62, y + h);
+      g.addColorStop(0.00, "rgba(226,238,255,0.115)");
+      g.addColorStop(0.14, "rgba(226,238,255,0.072)");
+      g.addColorStop(0.30, "rgba(226,238,255,0.020)");
+      g.addColorStop(0.52, "rgba(226,238,255,0)");
+      ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+      // and the room bouncing off the lower right, much weaker
+      var g2 = ctx.createLinearGradient(x + w, y + h, x + w * 0.55, y + h * 0.45);
+      g2.addColorStop(0.00, "rgba(200,215,235,0.035)");
+      g2.addColorStop(1.00, "rgba(200,215,235,0)");
+      ctx.fillStyle = g2; ctx.fillRect(x, y, w, h);
+    }
+    // Glass is never fully matte: a faint sheen down the top edge and a weak
+    // bounce off the desk along the bottom, both independent of the reflection toggle.
+    ctx.fillStyle = vGrad(x, y, h * 0.14, ["rgba(214,228,246,0.062)", "rgba(214,228,246,0)"]);
+    ctx.fillRect(x, y, w, h * 0.14);
+    ctx.fillStyle = vGrad(x, y + h * 0.92, h * 0.08, ["rgba(190,205,225,0)", "rgba(190,205,225,0.030)"]);
+    ctx.fillRect(x, y + h * 0.92, w, h * 0.08);
+    // glass edge: dark hairline, lighter along the top where the chamfer catches light
+    ctx.lineWidth = Math.max(1, w * 0.0018);
+    ctx.strokeStyle = "rgba(0,0,0,0.62)";
+    roundPath(ctx, x + 0.5, y + 0.5, w - 1, h - 1, r, r, r, r);
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.10)";
+    ctx.beginPath();
+    ctx.moveTo(x + r + 1, y + 1); ctx.lineTo(x + w - r - 1, y + 1);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* ================= stands ================= */
+
+  function standPlate(cx, top, dispW, standH, f) {
+    var nT = dispW * 0.150, nB = dispW * 0.170;
+    var pW = dispW * 0.330, pH = standH * 0.150, pY = top + standH - pH;
+    contactShadow(cx, pY + pH * 1.02, pW * 1.7, pH * 1.5);
+    function neck() {
+      ctx.beginPath();
+      ctx.moveTo(cx - nT / 2, top); ctx.lineTo(cx + nT / 2, top);
+      ctx.bezierCurveTo(cx + nT / 2, pY - pH * 1.2, cx + nB / 2, pY - pH * 0.6, cx + nB / 2, pY + pH * 0.6);
+      ctx.lineTo(cx - nB / 2, pY + pH * 0.6);
+      ctx.bezierCurveTo(cx - nB / 2, pY - pH * 0.6, cx - nT / 2, pY - pH * 1.2, cx - nT / 2, top);
+      ctx.closePath();
+    }
+    fillMetal(neck, cx - pW / 2, pW, f);
+    cylinderShade(neck, cx - nB / 2, nB, top, pY + pH - top);
+    ctx.save(); neck(); ctx.clip(); neckShadow(cx, top, nT * 1.2, standH * 0.16); ctx.restore();
+
+    function plate() { roundPath(ctx, cx - pW / 2, pY, pW, pH, pH * 0.44, pH * 0.44, pH * 0.5, pH * 0.5); }
+    fillMetal(plate, cx - pW / 2, pW, f);
+    ctx.save(); plate(); ctx.clip();
+    ctx.fillStyle = vGrad(cx, pY, pH, ["rgba(255,255,255,0.30)", "rgba(255,255,255,0.02)", "rgba(0,0,0,0.28)"]);
+    ctx.fillRect(cx - pW / 2, pY, pW, pH);
+    seatShadow(cx, pY, nB * 2.1, pH);
+    ctx.restore();
+  }
+
+  function standNeckFoot(cx, top, dispW, standH, f) {
+    var nT = dispW * 0.124, nB = dispW * 0.186;
+    var footW = dispW * 0.308, footH = standH * 0.30, footY = top + standH - footH;
+    var neckBottom = footY + footH * 0.7;
+    contactShadow(cx, footY + footH * 0.99, footW * 1.5, footH * 1.0);
+    function neck() {
+      ctx.beginPath();
+      ctx.moveTo(cx - nT / 2, top); ctx.lineTo(cx + nT / 2, top);
+      ctx.bezierCurveTo(cx + nT / 2, top + (neckBottom - top) * 0.5, cx + nB / 2, top + (neckBottom - top) * 0.74, cx + nB / 2, neckBottom);
+      ctx.lineTo(cx - nB / 2, neckBottom);
+      ctx.bezierCurveTo(cx - nB / 2, top + (neckBottom - top) * 0.74, cx - nT / 2, top + (neckBottom - top) * 0.5, cx - nT / 2, top);
+      ctx.closePath();
+    }
+    fillMetal(neck, cx - footW / 2, footW, f);
+    cylinderShade(neck, cx - nB / 2, nB, top, neckBottom - top);
+    ctx.save(); neck(); ctx.clip(); neckShadow(cx, top, nT * 1.2, standH * 0.22); ctx.restore();
+
+    var fx = cx - footW / 2, fb = footY + footH;
+    // The ends are rounded, not cusped — a lens shape with sharp tips reads as a
+    // paper cut-out. The bottom edge bows down slightly, as it does seen head-on.
+    // The bow is symmetric about fb, so the deepest point of the curve lands exactly
+    // on fb and the foot stays inside the box layout() solved for — it must not
+    // overhang, or it clips once padding goes to zero.
+    var er = footW * 0.034;
+    function foot() {
+      ctx.beginPath();
+      ctx.moveTo(fx + er, fb - er * 0.5);
+      ctx.quadraticCurveTo(cx, footY - footH * 0.16, fx + footW - er, fb - er * 0.5);
+      ctx.quadraticCurveTo(fx + footW, fb - er * 0.1, fx + footW - er * 1.5, fb - footH * 0.05);
+      ctx.quadraticCurveTo(cx, fb + footH * 0.05, fx + er * 1.5, fb - footH * 0.05);
+      ctx.quadraticCurveTo(fx, fb - er * 0.1, fx + er, fb - er * 0.5);
+      ctx.closePath();
+    }
+    fillMetal(foot, fx, footW, f);
+    ctx.save(); foot(); ctx.clip();
+    // The foot's face is close to horizontal, so it points at the key light and is
+    // the brightest metal on the device. Keep the darkening in the last fifth —
+    // spread over the whole face it turns the thin ends black.
+    ctx.fillStyle = vGrad(cx, footY, footH, ["rgba(255,255,255,0.52)", "rgba(255,255,255,0.24)", "rgba(0,0,0,0.02)", "rgba(0,0,0,0.30)"]);
+    ctx.fillRect(fx, footY, footW, footH);
+    seatShadow(cx, footY + footH * 0.15, nB * 1.5, footH);
+    aoUp(cx, fb + footH * 0.05, footW, footH * 0.26, 0.13);
+    ctx.restore();
+  }
+
+  function standSlab(cx, top, dispW, standH, f) {
+    var neckW = dispW * 0.235;
+    var footW = dispW * 0.262, footH = standH * 0.105, footY = top + standH - footH;
+    var neckH = (footY + footH * 0.6) - top, nx = cx - neckW / 2, r = neckW * 0.010;
+    contactShadow(cx, footY + footH, footW * 1.6, footH * 2.0);
+
+    function neck() { roundPath(ctx, nx, top, neckW, neckH, r, r, 0, 0); }
+    fillMetal(neck, cx - footW / 2, footW, f);
+    ctx.save(); neck(); ctx.clip();
+    // This slab is flat, camera-facing and almost as wide as the foot, so it takes
+    // the full metal sweep — including the specular, which lands around 20% across
+    // and reads as a smudge on a flat face. Cancel it there, roll the side edges
+    // away, and settle the whole slab to the brightness of the chin above it.
+    ctx.fillStyle = hGrad(nx, top, neckW, ["rgba(0,0,0,0.18)", "rgba(0,0,0,0.16)", "rgba(0,0,0,0.05)",
+                                           "rgba(0,0,0,0.03)", "rgba(0,0,0,0.05)", "rgba(0,0,0,0.16)"]);
+    ctx.fillRect(nx, top, neckW, neckH);
+    ctx.fillStyle = vGrad(cx, top, neckH, ["rgba(0,0,0,0)", "rgba(0,0,0,0.03)", "rgba(0,0,0,0.09)"]);
+    ctx.fillRect(nx, top, neckW, neckH);
+    neckShadow(cx, top, neckW, neckH * 0.26);
+    ctx.fillStyle = vGrad(cx, top + neckH * 0.55, neckH * 0.45, ["rgba(0,0,0,0)", "rgba(0,0,0,0.10)"]);
+    ctx.fillRect(nx, top + neckH * 0.55, neckW, neckH * 0.45);
+    ctx.restore();
+
+    var fx = cx - footW / 2;
+    function foot() { roundPath(ctx, fx, footY, footW, footH, footH * 0.14, footH * 0.14, footH * 0.44, footH * 0.44); }
+    fillMetal(foot, fx, footW, f);
+    ctx.save(); foot(); ctx.clip();
+    ctx.fillStyle = vGrad(cx, footY, footH, ["rgba(255,255,255,0.34)", "rgba(255,255,255,0.02)", "rgba(0,0,0,0.30)"]);
+    ctx.fillRect(fx, footY, footW, footH);
+    seatShadow(cx, footY, neckW * 1.5, footH);
+    aoUp(cx, footY + footH, footW, footH * 0.38, 0.14);
+    ctx.restore();
+  }
+
+  function standColumn(cx, top, dispW, standH, f) {
+    var hingeW = dispW * 0.115, hingeH = standH * 0.10, colW = dispW * 0.088;
+    var baseTopW = dispW * 0.335, baseBotW = dispW * 0.425, baseH = standH * 0.140;
+    var baseY = top + standH - baseH, colY = top + hingeH * 0.5;
+    var colH = (baseY + baseH * 0.7) - colY, u = dispW / 1000;
+    contactShadow(cx, baseY + baseH * 1.03, baseBotW * 1.45, baseH * 1.3);
+
+    var hy = top - hingeH * 0.2, hh = hingeH * 1.2, hx = cx - hingeW / 2;
+    function hinge() { roundPath(ctx, hx, hy, hingeW, hh, hingeH * 0.12, hingeH * 0.12, hingeH * 0.22, hingeH * 0.22); }
+    hinge();
+    ctx.fillStyle = vGrad(cx, hy, hh, ["#2b2b30", "#1b1b1e", "#121214"]);
+    ctx.fill();
+    ctx.save(); hinge(); ctx.clip();
+    // moulded plastic block: rounded in section, with a lit top edge and the
+    // display's shadow falling across it
+    ctx.fillStyle = hGrad(hx, hy, hingeW, ["rgba(0,0,0,0.45)", "rgba(255,255,255,0.10)", "rgba(255,255,255,0.02)", "rgba(0,0,0,0.45)"]);
+    ctx.fillRect(hx, hy, hingeW, hh);
+    ctx.fillStyle = vGrad(cx, hy, hh * 0.30, ["rgba(0,0,0,0.42)", "rgba(0,0,0,0)"]);
+    ctx.fillRect(hx, hy, hingeW, hh * 0.30);
+    ctx.fillStyle = "rgba(255,255,255,0.07)";
+    ctx.fillRect(hx + hingeW * 0.12, hy + hh * 0.32, hingeW * 0.76, Math.max(1, u));
+    ctx.restore();
+
+    function col() { roundPath(ctx, cx - colW / 2, colY, colW, colH, colW * 0.14, colW * 0.14, 0, 0); }
+    fillMetal(col, cx - baseBotW / 2, baseBotW, f);
+    cylinderShade(col, cx - colW / 2, colW, colY, colH);
+    ctx.save(); col(); ctx.clip();
+    neckShadow(cx, colY, colW, colH * 0.18);
+    ctx.fillStyle = "rgba(0,0,0,0.10)"; ctx.fillRect(cx - colW / 2, colY + colH * 0.46, colW, Math.max(1, u));
+    ctx.restore();
+
+    var rr = baseH * 0.30, faceH = baseH * 0.60;
+    function base() {
+      ctx.beginPath();
+      ctx.moveTo(cx - baseTopW / 2 + rr, baseY);
+      ctx.lineTo(cx + baseTopW / 2 - rr, baseY);
+      ctx.quadraticCurveTo(cx + baseTopW / 2, baseY, cx + baseBotW / 2 - rr * 0.5, baseY + faceH);
+      ctx.lineTo(cx + baseBotW / 2 - rr * 0.2, baseY + baseH - rr);
+      ctx.quadraticCurveTo(cx + baseBotW / 2, baseY + baseH, cx + baseBotW / 2 - rr, baseY + baseH);
+      ctx.lineTo(cx - baseBotW / 2 + rr, baseY + baseH);
+      ctx.quadraticCurveTo(cx - baseBotW / 2, baseY + baseH, cx - baseBotW / 2 + rr * 0.2, baseY + baseH - rr);
+      ctx.lineTo(cx - baseBotW / 2 + rr * 0.5, baseY + faceH);
+      ctx.quadraticCurveTo(cx - baseTopW / 2, baseY, cx - baseTopW / 2 + rr, baseY);
+      ctx.closePath();
+    }
+    fillMetal(base, cx - baseBotW / 2, baseBotW, f);
+    ctx.save(); base(); ctx.clip();
+    ctx.fillStyle = vGrad(cx, baseY, baseH, ["rgba(255,255,255,0.34)", "rgba(255,255,255,0.08)", "rgba(0,0,0,0.10)", "rgba(0,0,0,0.32)"]);
+    ctx.fillRect(cx - baseBotW / 2, baseY, baseBotW, baseH);
+    ctx.fillStyle = "rgba(0,0,0,0.14)"; ctx.fillRect(cx - baseBotW / 2, baseY + faceH, baseBotW, Math.max(1, u));
+    seatShadow(cx, baseY, colW * 3.2, baseH);
+    aoUp(cx, baseY + baseH, baseBotW, baseH * 0.30, 0.13);
+    ctx.restore();
+  }
+
+  /* ================= flat panel devices ================= */
+
+  function drawPanelDevice(L) {
+    var p = L.m.p, f = FINISH[state.finish];
+    var side = L.sw * p.side, top = L.sw * p.top, chin = L.sw * p.chin;
+    var dispW = L.sw + side * 2, dispH = L.sw * L.m.dispHF;
+    var dx = L.cx - dispW / 2, dy = L.top;
+    var R = dispW * p.bodyR, edge = Math.max(1, L.sw * p.edgeF);
+    var standH = dispH * p.standF, u = dispW / 1000;
+
+    if (p.stand === "plate") standPlate(L.cx, dy + dispH, dispW, standH, f);
+    else if (p.stand === "neckfoot") standNeckFoot(L.cx, dy + dispH, dispW, standH, f);
+    else if (p.stand === "slab") standSlab(L.cx, dy + dispH, dispW, standH, f);
+    else standColumn(L.cx, dy + dispH, dispW, standH, f);
+
+    function bodyPath() { roundPath(ctx, dx, dy, dispW, dispH, R, R, R, R); }
+    softShadow(bodyPath, 42, 26, 0.30);
+    softShadow(bodyPath, 10, 7, 0.22);
+
+    bodyPath(); ctx.fillStyle = vGrad(dx, dy, dispH, f.body); ctx.fill();
+    ctx.save(); bodyPath(); ctx.clip();
+    // The front face is flat and camera-facing, so its horizontal sweep is slight —
+    // only the rolled side edges fall off hard.
+    ctx.fillStyle = hGrad(dx, dy, dispW, ["rgba(0,0,0,0.22)", "rgba(255,255,255,0.06)", "rgba(255,255,255,0.01)", "rgba(0,0,0,0.22)"]);
+    ctx.fillRect(dx, dy, dispW, dispH);
+    if (!brushPat) brushPat = ctx.createPattern(brushTile, "repeat");
+    ctx.globalAlpha = 0.05; ctx.globalCompositeOperation = "overlay";
+    ctx.fillStyle = brushPat; ctx.fillRect(dx, dy, dispW, dispH);
+    ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+    // machined chamfer: bright rim above a dark seam
+    ctx.fillStyle = f.lip; ctx.globalAlpha = 0.5;
+    ctx.fillRect(dx, dy, dispW, Math.max(1, u));
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "rgba(0,0,0,0.18)";
+    ctx.fillRect(dx, dy + Math.max(1, u), dispW, Math.max(1, u * 0.8));
+    ctx.fillStyle = "rgba(0,0,0,0.22)";
+    ctx.fillRect(dx, dy + dispH - Math.max(1, u), dispW, Math.max(1, u));
+    ctx.restore();
+
+    var sx = dx + side, sy = dy + top;
+    var chinIsBody = p.chinCol === "body", bR = Math.max(0, R - edge);
+
+    if (p.bezel === "black") {
+      var by = dy + edge, bBottom = chinIsBody ? (sy + L.sh) : (dy + dispH - edge);
+      ctx.fillStyle = vGrad(dx, by, bBottom - by, ["#191a1e", "#0e0e11", "#08080a"]);
+      roundPath(ctx, dx + edge, by, dispW - edge * 2, bBottom - by, bR, bR, chinIsBody ? bR * 0.10 : bR, chinIsBody ? bR * 0.10 : bR);
+      ctx.fill();
+      // softbox reflection in the top-left of the glass
+      ctx.save();
+      roundPath(ctx, dx + edge, by, dispW - edge * 2, bBottom - by, bR, bR, chinIsBody ? bR * 0.10 : bR, chinIsBody ? bR * 0.10 : bR);
+      ctx.clip();
+      var rg = ctx.createRadialGradient(dx + dispW * 0.24, by + (bBottom - by) * 0.10, 0,
+                                        dx + dispW * 0.24, by + (bBottom - by) * 0.10, dispW * 0.42);
+      rg.addColorStop(0, "rgba(255,255,255,0.055)");
+      rg.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = rg; ctx.fillRect(dx, by, dispW, bBottom - by);
+      ctx.restore();
+    } else {
+      var ring = Math.max(1, L.sw * 0.0045);
+      ctx.fillStyle = "#0a0a0c";
+      roundPath(ctx, sx - ring, sy - ring, L.sw + ring * 2, L.sh + ring * 2, L.sw * 0.010, L.sw * 0.010, L.sw * 0.010, L.sw * 0.010);
+      ctx.fill();
+    }
+
+    if (p.camera) {
+      var camR = Math.max(1.2, top * (p.bezel === "black" ? 0.10 : 0.15));
+      ctx.beginPath(); ctx.arc(L.cx, dy + top * 0.5, camR, 0, Math.PI * 2);
+      ctx.fillStyle = p.bezel === "black" ? "rgba(190,205,215,0.26)" : "#121214"; ctx.fill();
+      ctx.beginPath();
+      ctx.arc(L.cx - camR * 0.26, dy + top * 0.5 - camR * 0.26, Math.max(0.5, camR * 0.24), 0, Math.PI * 2);
+      ctx.fillStyle = p.bezel === "black" ? "rgba(10,20,30,0.8)" : "rgba(255,255,255,0.32)"; ctx.fill();
+    }
+
+    drawScreen(sx, sy, L.sw, L.sh, L.sw * 0.0045);
+
+    var cy0 = sy + L.sh, cyH = dy + dispH - cy0;
+    if (chinIsBody) {
+      ctx.fillStyle = "rgba(0,0,0,0.32)"; ctx.fillRect(dx + edge, cy0, dispW - edge * 2, Math.max(1, u));
+      ctx.fillStyle = f.dark ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.5)";
+      ctx.fillRect(dx + edge, cy0 + Math.max(1, u), dispW - edge * 2, Math.max(1, u));
+      ctx.save(); bodyPath(); ctx.clip();
+      ctx.fillStyle = vGrad(dx, cy0, cyH, ["rgba(255,255,255,0.13)", "rgba(255,255,255,0)", "rgba(0,0,0,0.12)"]);
+      ctx.fillRect(dx, cy0, dispW, cyH);
+      ctx.restore();
+    }
+    if (p.buttons) {
+      var bwd = dispW * 0.010, bhh = cyH * 0.20, gap2 = dispW * 0.024;
+      var startX = dx + dispW - dispW * 0.070 - gap2 * 4;
+      for (var i = 0; i < 5; i++) {
+        ctx.fillStyle = chinIsBody ? "rgba(0,0,0,0.26)" : "rgba(255,255,255,0.24)";
+        roundPath(ctx, startX + gap2 * i, cy0 + cyH * 0.42, bwd, bhh, bhh * 0.4, bhh * 0.4, bhh * 0.4, bhh * 0.4);
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.arc(dx + dispW - dispW * 0.026, cy0 + cyH * 0.52, Math.max(1.1, cyH * 0.075), 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.5)"; ctx.fill();
+    }
+
+    ctx.strokeStyle = f.edge; ctx.lineWidth = Math.max(1, u);
+    roundPath(ctx, dx + 0.5, dy + 0.5, dispW - 1, dispH - 1, R, R, R, R);
+    ctx.stroke();
+  }
+
+  /* ================= laptop ================= */
+
+  function drawLaptop(L) {
+    var f = FINISH[state.finish];
+    var side = L.sw * LAPTOP.side, top = L.sw * LAPTOP.top, bot = L.sw * LAPTOP.bottom;
+    var lidW = L.sw + side * 2, lidH = L.sw * L.m.lidHF;
+    var lx = L.cx - lidW / 2, ly = L.top, R = lidW * LAPTOP.lidR, u = lidW / 1000;
+    var baseH = lidH * LAPTOP.baseF;
+    var baseTopW = lidW * 1.004, baseBotW = lidW * LAPTOP.flare, baseY = ly + lidH;
+
+    contactShadow(L.cx, baseY + baseH * 1.06, baseBotW * 1.25, baseH * 2.2);
+
+    function basePath() {
+      var rr = baseH * 0.62;
+      var tl = L.cx - baseTopW / 2, tr = L.cx + baseTopW / 2;
+      var bl = L.cx - baseBotW / 2, br = L.cx + baseBotW / 2;
+      ctx.beginPath();
+      ctx.moveTo(tl, baseY); ctx.lineTo(tr, baseY);
+      ctx.lineTo(br - rr * 0.25, baseY + baseH - rr);
+      ctx.quadraticCurveTo(br, baseY + baseH, br - rr, baseY + baseH);
+      ctx.lineTo(bl + rr, baseY + baseH);
+      ctx.quadraticCurveTo(bl, baseY + baseH, bl + rr * 0.25, baseY + baseH - rr);
+      ctx.closePath();
+    }
+    softShadow(basePath, 22, 14, 0.26);
+    basePath();
+    ctx.fillStyle = hGrad(L.cx - baseBotW / 2, baseY, baseBotW, [f.body[2], f.body[0], f.body[1], f.body[2]]);
+    ctx.fill();
+    ctx.save(); basePath(); ctx.clip();
+    ctx.fillStyle = vGrad(L.cx, baseY, baseH, ["rgba(255,255,255,0.34)", "rgba(255,255,255,0.04)", "rgba(0,0,0,0.30)"]);
+    ctx.fillRect(L.cx - baseBotW / 2, baseY, baseBotW, baseH);
+    // the lid overhangs the base and casts a hard, tight shadow into the hinge line
+    ctx.fillStyle = vGrad(L.cx, baseY, baseH * 0.40, ["rgba(0,0,0,0.42)", "rgba(0,0,0,0.10)", "rgba(0,0,0,0)"]);
+    ctx.fillRect(L.cx - baseBotW / 2, baseY, baseBotW, baseH * 0.40);
+    ctx.restore();
+
+    var nw = lidW * 0.088, nd = baseH * 0.42, ny = baseY + baseH - nd;
+    function notchPath() { roundPath(ctx, L.cx - nw / 2, ny, nw, nd + 2, nd * 0.55, nd * 0.55, 0, 0); }
+    ctx.save();
+    if (state.transparent) ctx.globalCompositeOperation = "destination-out";
+    ctx.fillStyle = state.transparent ? "#000" : state.bg;
+    notchPath();
+    ctx.fill();
+    ctx.restore();
+    // The notch is a scoop milled into the front edge, not a punched hole — the
+    // aluminium above it shades the top of the opening.
+    if (!state.transparent) {
+      ctx.save(); notchPath(); ctx.clip();
+      ctx.fillStyle = vGrad(L.cx, ny, nd * 0.62, ["rgba(0,0,0,0.30)", "rgba(0,0,0,0.09)", "rgba(0,0,0,0)"]);
+      ctx.fillRect(L.cx - nw / 2, ny, nw, nd * 0.62);
+      ctx.restore();
+    }
+
+    function lidPath() { roundPath(ctx, lx, ly, lidW, lidH, R, R, R * 0.12, R * 0.12); }
+    softShadow(lidPath, 40, 22, 0.28);
+    lidPath(); ctx.fillStyle = vGrad(lx, ly, lidH, f.body); ctx.fill();
+    ctx.save(); lidPath(); ctx.clip();
+    ctx.fillStyle = hGrad(lx, ly, lidW, ["rgba(0,0,0,0.2)", "rgba(255,255,255,0.18)", "rgba(255,255,255,0.03)", "rgba(0,0,0,0.2)"]);
+    ctx.fillRect(lx, ly, lidW, lidH);
+    if (!brushPat) brushPat = ctx.createPattern(brushTile, "repeat");
+    ctx.globalAlpha = 0.05; ctx.globalCompositeOperation = "overlay";
+    ctx.fillStyle = brushPat; ctx.fillRect(lx, ly, lidW, lidH);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 0.5; ctx.fillStyle = f.lip; ctx.fillRect(lx, ly, lidW, Math.max(1, u));
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    var gx = lx + side * 0.34, gy = ly + top * 0.30;
+    var gw = lidW - side * 0.68, gh = lidH - top * 0.30 - bot * 0.30;
+    ctx.fillStyle = vGrad(gx, gy, gh, ["#191a1d", "#0c0d10", "#08090b"]);
+    roundPath(ctx, gx, gy, gw, gh, R * 0.82, R * 0.82, R * 0.1, R * 0.1);
+    ctx.fill();
+
+    drawScreen(lx + side, ly + top, L.sw, L.sh, L.sw * 0.0075);
+
+    if (state.notch) {
+      var nW = L.sw * 0.088, nH = top * 0.82;
+      ctx.fillStyle = "#0a0a0c";
+      roundPath(ctx, L.cx - nW / 2, ly + top * 0.30 - 1, nW, nH, 0, 0, nH * 0.42, nH * 0.42);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(L.cx + nW * 0.24, ly + top * 0.30 + nH * 0.48, Math.max(1, nH * 0.13), 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(180,200,215,0.3)"; ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(L.cx, ly + top * 0.55, Math.max(1.2, top * 0.10), 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(190,205,215,0.3)"; ctx.fill();
+    }
+
+    ctx.strokeStyle = f.edge; ctx.lineWidth = Math.max(1, u);
+    roundPath(ctx, lx + 0.5, ly + 0.5, lidW - 1, lidH - 1, R, R, R * 0.12, R * 0.12);
+    ctx.stroke();
+  }
+
+  /* ================= bare window ================= */
+
+  function drawWindow(L) {
+    var dark = state.theme === "dark", scale = L.sw / 1200;
+    var r = Math.max(0, state.radius * Math.max(0.5, scale));
+    var bar = L.sw * WINDOW_BAR;
+    var x = L.cx - L.sw / 2, y = L.top, w = L.sw, h = L.sh + bar;
+
+    function pathFn() { roundPath(ctx, x, y, w, h, r, r, r, r); }
+    softShadow(pathFn, 46, 28, 0.30);
+    softShadow(pathFn, 12, 8, 0.20);
+
+    ctx.save(); pathFn(); ctx.clip();
+    ctx.fillStyle = vGrad(x, y, bar, dark ? ["#3a3a3c", "#2c2c2e"] : ["#f7f7f8", "#e9e9eb"]);
+    ctx.fillRect(x, y, w, bar);
+    ctx.fillStyle = dark ? "rgba(0,0,0,0.55)" : "rgba(0,0,0,0.14)";
+    ctx.fillRect(x, y + bar - Math.max(1, bar * 0.022), w, Math.max(1, bar * 0.022));
+    ctx.fillStyle = dark ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.85)";
+    ctx.fillRect(x, y, w, Math.max(1, bar * 0.025));
+    var dr = bar * 0.208, gap = dr * 3.35, cy = y + bar / 2, cx0 = x + bar * 0.66;
+    var dots = [["#ff5f57", "#e0443e"], ["#febc2e", "#dea123"], ["#28c840", "#1aab29"]];
+    for (var i = 0; i < 3; i++) {
+      var g = ctx.createLinearGradient(0, cy - dr, 0, cy + dr);
+      g.addColorStop(0, dots[i][0]); g.addColorStop(1, dots[i][1]);
+      ctx.beginPath(); ctx.arc(cx0 + dr + gap * i, cy, dr, 0, Math.PI * 2);
+      ctx.fillStyle = g; ctx.fill();
+      ctx.lineWidth = Math.max(0.5, dr * 0.09); ctx.strokeStyle = "rgba(0,0,0,0.13)"; ctx.stroke();
+    }
+    if (state.title) {
+      ctx.font = "600 " + Math.round(bar * 0.4) + "px -apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillStyle = dark ? "rgba(255,255,255,0.72)" : "rgba(0,0,0,0.56)";
+      ctx.fillText(state.title, x + w / 2, cy + bar * 0.02, w * 0.55);
+      ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    }
+    ctx.restore();
+
+    ctx.save();
+    roundPath(ctx, x, y + bar, w, L.sh, 0, 0, r, r); ctx.clip();
+    drawScreen(x, y + bar, w, L.sh, 0);
+    ctx.restore();
+
+    ctx.save();
+    roundPath(ctx, x + 0.5, y + 0.5, w - 1, h - 1, r, r, r, r);
+    ctx.lineWidth = Math.max(1, 1.2 * scale);
+    ctx.strokeStyle = dark ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.10)";
+    ctx.stroke(); ctx.restore();
+  }
+
+  /* ================= photo-backed device ================= */
+
+  function photoRect() {
+    var pad = state.padding / 100;
+    var availW = canvas.width * (1 - pad * 2), availH = canvas.height * (1 - pad * 2);
+    var iw = devicePhoto.naturalWidth, ih = devicePhoto.naturalHeight;
+    var s = Math.min(availW / iw, availH / ih);
+    return { x: (canvas.width - iw * s) / 2, y: (canvas.height - ih * s) / 2, w: iw * s, h: ih * s };
+  }
+
+  function defaultQuad() {
+    return [{ x: 0.10, y: 0.08 }, { x: 0.90, y: 0.08 }, { x: 0.90, y: 0.62 }, { x: 0.10, y: 0.62 }];
+  }
+
+  // maps the unit square onto an arbitrary quad (projective)
+  function homography(q) {
+    var x0 = q[0].x, y0 = q[0].y, x1 = q[1].x, y1 = q[1].y;
+    var x2 = q[2].x, y2 = q[2].y, x3 = q[3].x, y3 = q[3].y;
+    var dx1 = x1 - x2, dx2 = x3 - x2, dy1 = y1 - y2, dy2 = y3 - y2;
+    var sx = x0 - x1 + x2 - x3, sy = y0 - y1 + y2 - y3;
+    var g, h, den = dx1 * dy2 - dx2 * dy1;
+    if (Math.abs(sx) < 1e-9 && Math.abs(sy) < 1e-9) { g = 0; h = 0; }
+    else if (Math.abs(den) < 1e-9) { g = 0; h = 0; }
+    else { g = (sx * dy2 - dx2 * sy) / den; h = (dx1 * sy - sx * dy1) / den; }
+    var a = x1 - x0 + g * x1, b = x3 - x0 + h * x3, c = x0;
+    var d = y1 - y0 + g * y1, e = y3 - y0 + h * y3, ff = y0;
+    return function (u, v) {
+      var w = g * u + h * v + 1;
+      return { x: (a * u + b * v + c) / w, y: (d * u + e * v + ff) / w };
+    };
+  }
+
+  function drawTri(img, s0, s1, s2, d0, d1, d2) {
+    var den = s0.x * (s2.y - s1.y) - s1.x * s2.y + s2.x * s1.y + (s1.x - s2.x) * s0.y;
+    if (Math.abs(den) < 1e-9) return;
+    var m11 = -(s0.y * (d2.x - d1.x) - s1.y * d2.x + s2.y * d1.x + (s1.y - s2.y) * d0.x) / den;
+    var m12 = (s1.y * d2.y + s0.y * (d1.y - d2.y) - s2.y * d1.y + (s2.y - s1.y) * d0.y) / den;
+    var m21 = (s0.x * (d2.x - d1.x) - s1.x * d2.x + s2.x * d1.x + (s1.x - s2.x) * d0.x) / den;
+    var m22 = -(s1.x * d2.y + s0.x * (d1.y - d2.y) - s2.x * d1.y + (s2.x - s1.x) * d0.y) / den;
+    var dx = (s0.x * (s2.y * d1.x - s1.y * d2.x) + s0.y * (s1.x * d2.x - s2.x * d1.x) + (s2.x * s1.y - s1.x * s2.y) * d0.x) / den;
+    var dy = (s0.x * (s2.y * d1.y - s1.y * d2.y) + s0.y * (s1.x * d2.y - s2.x * d1.y) + (s2.x * s1.y - s1.x * s2.y) * d0.y) / den;
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(d0.x, d0.y); ctx.lineTo(d1.x, d1.y); ctx.lineTo(d2.x, d2.y); ctx.closePath();
+    ctx.clip();
+    ctx.transform(m11, m12, m21, m22, dx, dy);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
+  }
+
+  function drawIntoQuad(el, quadPx) {
+    var vw = el.videoWidth || el.naturalWidth, vh = el.videoHeight || el.naturalHeight;
+    if (!vw || !vh) return;
+    // source rect honouring contain / cover inside the quad's own aspect
+    var qw = Math.hypot(quadPx[1].x - quadPx[0].x, quadPx[1].y - quadPx[0].y);
+    var qh = Math.hypot(quadPx[3].x - quadPx[0].x, quadPx[3].y - quadPx[0].y);
+    var qAr = qw / Math.max(1, qh), sAr = vw / vh;
+    var sx = 0, sy = 0, sw = vw, sh = vh;
+    if (state.cover) {
+      if (sAr > qAr) { sw = vh * qAr; sx = (vw - sw) / 2; } else { sh = vw / qAr; sy = (vh - sh) / 2; }
+    }
+    var axisAligned = Math.abs(quadPx[0].y - quadPx[1].y) < 0.6 && Math.abs(quadPx[2].y - quadPx[3].y) < 0.6 &&
+                      Math.abs(quadPx[0].x - quadPx[3].x) < 0.6 && Math.abs(quadPx[1].x - quadPx[2].x) < 0.6;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(quadPx[0].x, quadPx[0].y);
+    for (var i = 1; i < 4; i++) ctx.lineTo(quadPx[i].x, quadPx[i].y);
+    ctx.closePath();
+    ctx.clip();
+    if (axisAligned) {
+      var x = Math.min(quadPx[0].x, quadPx[3].x), y = Math.min(quadPx[0].y, quadPx[1].y);
+      var w = Math.max(quadPx[1].x, quadPx[2].x) - x, h = Math.max(quadPx[2].y, quadPx[3].y) - y;
+      if (state.cover) ctx.drawImage(el, sx, sy, sw, sh, x, y, w, h);
+      else {
+        var s = Math.min(w / vw, h / vh);
+        ctx.drawImage(el, x + (w - vw * s) / 2, y + (h - vh * s) / 2, vw * s, vh * s);
+      }
+    } else {
+      var map = homography(quadPx);
+      var N = 10;
+      for (var r = 0; r < N; r++) {
+        for (var c2 = 0; c2 < N; c2++) {
+          var u0 = c2 / N, u1 = (c2 + 1) / N, v0 = r / N, v1 = (r + 1) / N;
+          var p00 = map(u0, v0), p10 = map(u1, v0), p11 = map(u1, v1), p01 = map(u0, v1);
+          var t00 = { x: sx + u0 * sw, y: sy + v0 * sh }, t10 = { x: sx + u1 * sw, y: sy + v0 * sh };
+          var t11 = { x: sx + u1 * sw, y: sy + v1 * sh }, t01 = { x: sx + u0 * sw, y: sy + v1 * sh };
+          drawTri(el, t00, t10, t11, p00, p10, p11);
+          drawTri(el, t00, t11, t01, p00, p11, p01);
+        }
+      }
+    }
+    if (state.screenShade) {
+      // let the photo's own lighting show through so the content sits in the glass
+      var q = quadPx;
+      var gx = ctx.createLinearGradient(q[0].x, q[0].y, q[2].x, q[2].y);
+      gx.addColorStop(0, "rgba(255,255,255,0.06)");
+      gx.addColorStop(0.45, "rgba(255,255,255,0)");
+      gx.addColorStop(1, "rgba(0,0,0,0.10)");
+      ctx.fillStyle = gx;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    ctx.restore();
+  }
+
+  function quadPx() {
+    var r = photoRect();
+    return photo.quad.map(function (p) { return { x: r.x + p.x * r.w, y: r.y + p.y * r.h }; });
+  }
+
+  function drawPhotoDevice() {
+    if (!photo.loaded) {
+      if (state.exporting) return;   // never bake the prompt into an export
+      ctx.fillStyle = "rgba(0,0,0,0.45)";
+      ctx.font = "500 " + Math.round(canvas.width * 0.022) + "px -apple-system,BlinkMacSystemFont,sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Choose a device photo in the panel on the left", canvas.width / 2, canvas.height / 2);
+      ctx.textAlign = "left";
+      return;
+    }
+    var r = photoRect();
+    ctx.drawImage(devicePhoto, r.x, r.y, r.w, r.h);
+    var el = mediaEl();
+    if (el) drawIntoQuad(el, quadPx());
+
+    if (!state.exporting) {
+      var q = quadPx(), hr = Math.max(6, canvas.width * 0.009);
+      ctx.save();
+      ctx.strokeStyle = "rgba(37,99,235,0.9)";
+      ctx.lineWidth = Math.max(1.5, canvas.width * 0.0016);
+      ctx.setLineDash([canvas.width * 0.008, canvas.width * 0.006]);
+      ctx.beginPath(); ctx.moveTo(q[0].x, q[0].y);
+      for (var i = 1; i < 4; i++) ctx.lineTo(q[i].x, q[i].y);
+      ctx.closePath(); ctx.stroke();
+      ctx.setLineDash([]);
+      for (var j = 0; j < 4; j++) {
+        ctx.beginPath(); ctx.arc(q[j].x, q[j].y, hr, 0, Math.PI * 2);
+        ctx.fillStyle = "#fff"; ctx.fill();
+        ctx.strokeStyle = "#2563eb"; ctx.lineWidth = Math.max(2, hr * 0.28); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  /* ================= main draw ================= */
+
+  function draw() {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!state.transparent) {
+      ctx.fillStyle = state.bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // A flat fill reads as a sticker on paper. Real product shots sit in a lit
+      // sweep: a pool of light behind the subject falling off into the corners.
+      // Expressed as white/black alpha so it works over any swatch, light or dark.
+      if (state.backdrop) {
+        var W = canvas.width, H = canvas.height;
+        var g = ctx.createRadialGradient(W / 2, H * 0.40, 0, W / 2, H * 0.40, Math.max(W, H) * 0.74);
+        g.addColorStop(0.00, "rgba(255,255,255,0.070)");
+        g.addColorStop(0.45, "rgba(255,255,255,0.022)");
+        g.addColorStop(0.72, "rgba(0,0,0,0.028)");
+        g.addColorStop(1.00, "rgba(0,0,0,0.115)");
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      }
+    }
+    ctx.restore();
+
+    if (state.device === "photo") drawPhotoDevice();
+    else {
+      var L = layout();
+      if (state.device === "window") drawWindow(L);
+      else if (state.device === "laptop") drawLaptop(L);
+      else drawPanelDevice(L);
+    }
+
+    if (state.grain) {
+      if (!grainPat) grainPat = ctx.createPattern(grainTile, "repeat");
+      ctx.save();
+      ctx.globalAlpha = 0.045;
+      // "overlay" over an empty pixel still deposits alpha (Sa + Da(1-Sa) = 0.045),
+      // which left a ~4% haze across the whole frame and stopped transparent exports
+      // from being properly clear. "source-atop" keeps the grain inside pixels that
+      // already exist and leaves destination alpha untouched.
+      ctx.globalCompositeOperation = state.transparent ? "source-atop" : "overlay";
+      ctx.fillStyle = grainPat;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    }
+  }
+
+  function fmt(s) {
+    if (!isFinite(s)) return "0:00";
+    var m = Math.floor(s / 60), sec = Math.floor(s % 60);
+    return m + ":" + (sec < 10 ? "0" : "") + sec;
+  }
+  // trim points need tenths — whole seconds hide any sub-second adjustment
+  function fmtP(s) {
+    if (!isFinite(s)) return "0:00.0";
+    var m = Math.floor(s / 60), sec = s % 60;
+    return m + ":" + (sec < 10 ? "0" : "") + sec.toFixed(1);
+  }
+
+  /* ================= trim ================= */
+
+  function clipLen() { return Math.max(0, state.trimEnd - state.trimStart); }
+  function trimmed() {
+    var d = video.duration || 0;
+    return src.kind === "video" && isFinite(d) && d > 0 &&
+           (state.trimStart > 0.01 || state.trimEnd < d - 0.01);
+  }
+  function resetTrim() {
+    state.trimStart = 0;
+    state.trimEnd = (video.duration && isFinite(video.duration)) ? video.duration : 0;
+    syncTrimUI();
+  }
+  // The playhead and both trim handles live on one track, so everything about the
+  // clip is read and edited in the same place.
+  function hasClip() {
+    var d = video.duration || 0;
+    return src.kind === "video" && isFinite(d) && d > 0;
+  }
+  function pct(sec) { var d = video.duration || 0; return d ? Math.max(0, Math.min(100, (sec / d) * 100)) : 0; }
+  var HALF_HANDLE = 7;
+  function handleX(p) {
+    var w = $("tl").clientWidth || 1;
+    return Math.max(HALF_HANDLE, Math.min(w - HALF_HANDLE, (p / 100) * w));
+  }
+  function syncTrimUI() {
+    var live = hasClip();
+    $("tl").setAttribute("aria-disabled", live ? "false" : "true");
+    $("trimBar").style.display = live ? "flex" : "none";
+    if (!live) return;
+    var d = video.duration, a = pct(state.trimStart), b = pct(state.trimEnd);
+    $("tlSel").style.left = a + "%";
+    $("tlSel").style.width = Math.max(0, b - a) + "%";
+    // Handles are positioned in px and kept a half-width inside the track — at 0%
+    // and 100% they would otherwise hang half outside it and be awkward to grab.
+    $("tlA").style.left = handleX(a) + "px";
+    $("tlB").style.left = handleX(b) + "px";
+    $("tlA").setAttribute("aria-valuemax", d.toFixed(2));
+    $("tlB").setAttribute("aria-valuemax", d.toFixed(2));
+    $("tlA").setAttribute("aria-valuenow", state.trimStart.toFixed(2));
+    $("tlB").setAttribute("aria-valuenow", state.trimEnd.toFixed(2));
+    $("trimReadout").textContent = fmtP(state.trimStart) + " → " + fmtP(state.trimEnd) +
+      " · " + clipLen().toFixed(1) + "s" + (trimmed() ? " of " + d.toFixed(1) + "s" : " (whole clip)");
+    syncEstimate();
+    updateMeta();   // the stage header reports the trimmed length too
+  }
+  // the playhead moves every frame, so it is updated separately from the rest
+  function syncPlayhead() {
+    if (!hasClip()) return;
+    var p = pct(video.currentTime), a = pct(state.trimStart);
+    $("tlPlay").style.left = p + "%";
+    $("tlProg").style.left = a + "%";
+    $("tlProg").style.width = Math.max(0, Math.min(pct(state.trimEnd), p) - a) + "%";
+  }
+  var MIN_CLIP = 0.2;
+  function setTrim(which, secs) {
+    var d = video.duration || 0;
+    if (!d || !isFinite(d)) return;
+    secs = Math.max(0, Math.min(d, secs));
+    if (which === "a") state.trimStart = Math.min(secs, state.trimEnd - MIN_CLIP);
+    else state.trimEnd = Math.max(secs, state.trimStart + MIN_CLIP);
+    state.trimStart = Math.max(0, state.trimStart);
+    state.trimEnd = Math.min(d, state.trimEnd);
+    syncTrimUI();
+  }
+
+  var seeking = false, stillStart = 0, stillLen = 0;
+  function tick() {
+    draw();
+    if (src.kind === "video" && !seeking) {
+      var d = video.duration || 0;
+      if (d && isFinite(d)) {
+        var t = video.currentTime;
+        // Playback — and recording — stay inside the trim. Stopping the recorder
+        // here is what makes the exported file the trimmed length.
+        if (t >= state.trimEnd - 0.02) {
+          if (state.recording) {
+            if (recorder && recorder.state !== "inactive") { video.pause(); recorder.stop(); }
+          } else if (video.loop) {
+            video.currentTime = state.trimStart;
+          } else if (!video.paused) {
+            video.pause(); $("play").textContent = "Play";
+          }
+        } else if (t < state.trimStart - 0.05 && !state.recording) {
+          video.currentTime = state.trimStart;
+        }
+        syncPlayhead();
+        $("time").textContent = fmt(t) + " / " + fmt(d);
+        if (state.recording && clipLen() > 0) {
+          $("bar").firstElementChild.style.width =
+            Math.min(100, ((t - state.trimStart) / clipLen()) * 100).toFixed(1) + "%";
+        }
+      }
+    } else if (state.recording && stillLen) {
+      $("bar").firstElementChild.style.width = Math.min(100, ((Date.now() - stillStart) / (stillLen * 1000)) * 100).toFixed(1) + "%";
+    }
+    requestAnimationFrame(tick);
+  }
+
+  /* ================= sources ================= */
+
+  var objectUrl = null, photoUrl = null;
+
+  function updateMeta() {
+    var el = mediaEl();
+    if (!el) { $("meta").textContent = ""; return; }
+    var w = el.videoWidth || el.naturalWidth, h = el.videoHeight || el.naturalHeight;
+    var shape = state.device === "photo" ? "mapped into photo"
+      : state.screenAr === "source" ? "screen wraps source"
+      : "screen " + $("screenAr").options[$("screenAr").selectedIndex].text.replace(/^(Standard|Ultrawide) /, "");
+    $("meta").textContent = w + "×" + h + " source → " + canvas.width + "×" + canvas.height + " canvas · " + shape +
+      (src.kind === "video" ? " · " + (trimmed() ? clipLen().toFixed(1) + "s trimmed" : fmt(video.duration)) : " · still image");
+  }
+  function enable(on) {
+    ["export", "png"].forEach(function (id) { $(id).disabled = !on; });
+    syncExportLabel();
+    var isVid = src.kind === "video";
+    ["play", "restart"].forEach(function (id) { $(id).disabled = !(on && isVid); });
+    $("stillRow").style.display = (on && !isVid) ? "flex" : "none";
+    $("withAudio").disabled = !isVid;
+    $("time").textContent = src.kind === "image" ? "still" : isVid ? $("time").textContent : "0:00 / 0:00";
+    $("empty").style.display = src.kind ? "none" : "flex";
+    syncTrimUI();
+    syncEstimate();
+  }
+
+  // Recording is real time, so the cost of pressing Export is knowable up front —
+  // a 40s clip silently taking 40s is this tool's least obvious behaviour.
+  function syncEstimate() {
+    var el = $("est");
+    if (!canExport()) { el.textContent = ""; return; }
+    var secs = src.kind === "video" ? clipLen()
+             : Math.max(1, Math.min(60, parseFloat($("stillSecs").value) || 5));
+    el.textContent = "Records in real time — about " +
+      (secs < 10 ? secs.toFixed(1) : String(Math.round(secs))) + "s. Keep this tab visible.";
+  }
+  function loadFile(f) {
+    if (!f) return;
+    var isImg = /^image\//.test(f.type) || /\.(png|jpe?g|webp|gif|bmp|avif|svg)$/i.test(f.name);
+    var isVid = /^video\//.test(f.type) || /\.(mp4|mov|webm|m4v|mkv|avi)$/i.test(f.name);
+    if (!isImg && !isVid) { setStatus("That file is neither a video nor an image.", true); return; }
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    objectUrl = URL.createObjectURL(f);
+    $("fileInfo").textContent = f.name + " — " + (f.size / 1048576).toFixed(2) + " MB";
+    setStatus("");
+    if (isVid) {
+      src.kind = "video";
+      video.src = objectUrl; video.loop = $("loop").checked;
+      video.onloadedmetadata = function () {
+        src.ar = (video.videoWidth && video.videoHeight) ? video.videoWidth / video.videoHeight : 16 / 9;
+        resetTrim();
+        enable(true); updateMeta(); video.currentTime = 0;
+        video.play().then(function () { $("play").textContent = "Pause"; }).catch(function () {});
+      };
+      video.onerror = function () {
+        src.kind = null; enable(false);
+        if (!/^(https?|file):$/.test(location.protocol)) setStatus("This preview pane blocks local media playback. Open the HTML file directly in Chrome or Safari.", true);
+        else setStatus("Your browser can't decode this file (common with ProRes/HEVC .mov). Try MP4 (H.264) or WebM.", true);
+      };
+    } else {
+      try { video.pause(); } catch (e) {}
+      video.removeAttribute("src");
+      src.kind = "image";
+      image.onload = function () { src.ar = image.naturalWidth / image.naturalHeight || 16 / 9; enable(true); updateMeta(); };
+      image.onerror = function () { src.kind = null; enable(false); setStatus("Couldn't load that image.", true); };
+      image.src = objectUrl;
+    }
+  }
+  function loadPhoto(f) {
+    if (!f) return;
+    if (photoUrl) URL.revokeObjectURL(photoUrl);
+    photoUrl = URL.createObjectURL(f);
+    devicePhoto.onload = function () {
+      photo.loaded = true;
+      if (!photo.quad) photo.quad = defaultQuad();
+      $("photoInfo").textContent = f.name + " — " + devicePhoto.naturalWidth + "×" + devicePhoto.naturalHeight +
+        ". Drag the four handles onto the screen corners.";
+      updateMeta();
+    };
+    devicePhoto.onerror = function () { photo.loaded = false; $("photoInfo").textContent = "Couldn't load that image."; };
+    devicePhoto.src = photoUrl;
+  }
+
+  $("pick").onclick = function () { $("file").click(); };
+  $("pick2").onclick = function () { $("file").click(); };
+  $("stillSecs").addEventListener("input", syncEstimate);
+  $("file").onchange = function (e) { loadFile(e.target.files[0]); };
+  $("pickPhoto").onclick = function () { $("photoFile").click(); };
+  $("photoFile").onchange = function (e) { loadPhoto(e.target.files[0]); };
+  $("resetQuad").onclick = function () { photo.quad = defaultQuad(); };
+  $("screenShade").onchange = function (e) { state.screenShade = e.target.checked; };
+
+  var wrap = $("wrap");
+  ["dragenter", "dragover"].forEach(function (ev) { wrap.addEventListener(ev, function (e) { e.preventDefault(); wrap.classList.add("drag"); }); });
+  ["dragleave", "drop"].forEach(function (ev) { wrap.addEventListener(ev, function (e) { e.preventDefault(); wrap.classList.remove("drag"); }); });
+  wrap.addEventListener("drop", function (e) {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+  });
+
+  /* ================= corner dragging ================= */
+
+  var dragIdx = -1;
+  function canvasPoint(e) {
+    var r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * canvas.width / r.width, y: (e.clientY - r.top) * canvas.height / r.height };
+  }
+  canvas.addEventListener("pointerdown", function (e) {
+    if (state.device !== "photo" || !photo.loaded) return;
+    var p = canvasPoint(e), q = quadPx(), best = -1, bd = 1e9;
+    for (var i = 0; i < 4; i++) {
+      var d = Math.hypot(q[i].x - p.x, q[i].y - p.y);
+      if (d < bd) { bd = d; best = i; }
+    }
+    if (bd < Math.max(18, canvas.width * 0.02)) {
+      dragIdx = best; canvas.setPointerCapture(e.pointerId); e.preventDefault();
+    }
+  });
+  canvas.addEventListener("pointermove", function (e) {
+    if (dragIdx < 0) return;
+    var p = canvasPoint(e), r = photoRect();
+    photo.quad[dragIdx] = {
+      x: Math.max(-0.2, Math.min(1.2, (p.x - r.x) / r.w)),
+      y: Math.max(-0.2, Math.min(1.2, (p.y - r.y) / r.h))
+    };
+  });
+  ["pointerup", "pointercancel"].forEach(function (ev) {
+    canvas.addEventListener(ev, function () { dragIdx = -1; });
+  });
+
+  /* ================= controls ================= */
+
+  // Visibility depends on BOTH the chosen device and the mode, so it is resolved in
+  // one place — two independent handlers poking style.display fight each other.
+  function show(id, on, how) { $(id).style.display = on ? (how || "block") : "none"; }
+  function refreshVisibility() {
+    var quick = state.mode === "quick";
+    var isWin = state.device === "window", isPhoto = state.device === "photo";
+    show("photoGroup", isPhoto && !quick);
+    show("finishGroup", !isWin && !isPhoto && !quick);
+    show("shapeGroup", !isPhoto && !quick);
+    show("framingGroup", !quick);
+    show("presetGroup", !quick);
+    show("fpsRow", !quick, "flex");
+    show("radiusRow", isWin && !quick, "flex");
+    show("themeRow", isWin && !quick, "flex");
+    show("titleRow", isWin && !quick, "flex");
+    show("notchRow", state.device === "laptop" && !quick, "flex");
+  }
+
+  /* ---- remembering the setup between sessions ---- */
+  var saveTimer = null;
+  function queueSave() { clearTimeout(saveTimer); saveTimer = setTimeout(saveSettings, 250); }
+  function saveSettings() {
+    try {
+      localStorage.setItem("mockup.settings", JSON.stringify({
+        mode: state.mode, device: state.device, finish: state.finish, screenAr: state.screenAr,
+        preset: canvas.width + "x" + canvas.height, bg: state.bg, transparent: state.transparent,
+        padding: state.padding, shadow: state.shadow, radius: state.radius, theme: state.theme,
+        cover: state.cover, reflect: state.reflect, backdrop: state.backdrop,
+        grain: state.grain, notch: state.notch,
+        fps: $("fps").value, withAudio: $("withAudio").checked
+      }));
+    } catch (e) {}
+  }
+  // Restore by writing to the controls and firing their own events, so there is one
+  // path into `state` rather than a second one that can drift out of sync.
+  function restoreSettings() {
+    var o = null;
+    try { o = JSON.parse(localStorage.getItem("mockup.settings") || "null"); } catch (e) {}
+    if (!o) return null;
+    function fire(el, type) { el.dispatchEvent(new Event(type, { bubbles: true })); }
+    function sel(id, v) {
+      var el = $(id);
+      if (v == null || !el || ![].some.call(el.options, function (op) { return op.value === v; })) return;
+      el.value = v; fire(el, "change");
+    }
+    function num(id, v) { if (typeof v === "number" && isFinite(v)) { $(id).value = v; fire($(id), "input"); } }
+    function chk(id, v) { if (typeof v === "boolean") { $(id).checked = v; fire($(id), "change"); } }
+    sel("device", o.device); sel("finish", o.finish); sel("screenAr", o.screenAr);
+    sel("theme", o.theme); sel("fps", o.fps);
+    if (o.preset) setCanvasSize(o.preset);
+    num("padding", o.padding); num("shadow", o.shadow); num("radius", o.radius);
+    // colour before transparency — picking a colour clears the transparent flag
+    if (typeof o.bg === "string") { $("bgColor").value = o.bg; fire($("bgColor"), "input"); }
+    chk("transparent", o.transparent);
+    chk("fitCover", o.cover); chk("reflect", o.reflect); chk("backdrop", o.backdrop);
+    chk("grain", o.grain); chk("notch", o.notch); chk("withAudio", o.withAudio);
+    return o.mode;
+  }
+  document.addEventListener("input", queueSave, true);
+  document.addEventListener("change", queueSave, true);
+
+  /* ---- which sections were left open ---- */
+  var SECTIONS = ["secContent", "secDevice", "secScene", "secExport"];
+  function saveSections() {
+    if (state.mode === "quick") return;         // Quick forces them all open
+    try {
+      localStorage.setItem("mockup.sections", JSON.stringify(
+        SECTIONS.filter(function (id) { return $(id).open; })));
+    } catch (e) {}
+  }
+  function restoreSections() {
+    var open = null;
+    try { open = JSON.parse(localStorage.getItem("mockup.sections") || "null"); } catch (e) {}
+    if (!open || !open.length) return;
+    SECTIONS.forEach(function (id) { $(id).open = open.indexOf(id) > -1; });
+  }
+  SECTIONS.forEach(function (id) { $(id).addEventListener("toggle", saveSections); });
+
+  function applyMode(mode) {
+    state.mode = mode === "full" ? "full" : "quick";
+    var quick = state.mode === "quick";
+    $("panel").classList.toggle("quick", quick);
+    if (quick) SECTIONS.forEach(function (id) { $(id).open = true; });
+    else restoreSections();
+    $("modeQuick").setAttribute("aria-pressed", quick ? "true" : "false");
+    $("modeFull").setAttribute("aria-pressed", quick ? "false" : "true");
+    // Photo mode needs the four corner handles dragged onto a product shot — that is
+    // a designer job, so it is not offered in Quick.
+    var photoOpt = $("device").querySelector('option[value="photo"]');
+    if (photoOpt) photoOpt.hidden = quick;
+    if (quick) {
+      if (state.device === "photo") { $("device").value = "imac24"; state.device = "imac24"; }
+      state.reflect = true; $("reflect").checked = true;   // glare is always on, with no toggle
+      $("fps").value = "60";                               // and always 60 fps
+    }
+    refreshVisibility();
+    queueSave();
+    updateMeta();
+  }
+  $("modeQuick").onclick = function () { applyMode("quick"); };
+  $("modeFull").onclick = function () { applyMode("full"); };
+
+  $("device").onchange = function (e) {
+    state.device = e.target.value;
+    if (state.device === "photo" && !photo.quad) photo.quad = defaultQuad();
+    refreshVisibility();
+    updateMeta();
+  };
+  $("finish").onchange = function (e) { state.finish = e.target.value; };
+
+  var SWATCHES = [
+    ["#15ffb9", "Loomery green"], ["#00c0aa", "Loomery green (legacy)"], ["#04564d", "Loomery dark green"],
+    ["#1a1b1f", "Loomery black"], ["#181825", "Rebrand blue"], ["#5b4ee9", "Blue"],
+    ["#c7c7c7", "Light grey"], ["#f5f5f7", "Off-white"], ["#ffffff", "White"]
+  ];
+  var swWrap = $("swatches");
+  SWATCHES.forEach(function (s) {
+    var b = document.createElement("button");
+    b.className = "sw"; b.style.background = s[0]; b.title = s[0];
+    b.setAttribute("aria-label", s[1] + " " + s[0]);
+    b.onclick = function () {
+      $("transparent").checked = false; state.transparent = false;
+      $("bgNote").style.display = "none"; $("resultVideo").classList.remove("alpha");
+      setBg(s[0]); syncExportLabel();
+    };
+    swWrap.appendChild(b);
+  });
+  function setBg(c) {
+    state.bg = c; $("bgColor").value = c; $("bgHex").textContent = c;
+    Array.prototype.forEach.call(swWrap.children, function (el) {
+      el.setAttribute("aria-pressed", (!state.transparent && el.title.toLowerCase() === c.toLowerCase()) ? "true" : "false");
+    });
+    queueSave();   // swatches are clicks, which the input/change listeners miss
+  }
+  $("bgColor").oninput = function (e) {
+    $("transparent").checked = false; state.transparent = false;
+    $("bgNote").style.display = "none"; $("resultVideo").classList.remove("alpha");
+    setBg(e.target.value); syncExportLabel();
+  };
+  $("transparent").onchange = function (e) {
+    state.transparent = e.target.checked;
+    $("bgNote").style.display = e.target.checked ? "block" : "none";
+    $("resultVideo").classList.toggle("alpha", e.target.checked);
+    setBg(state.bg); syncExportLabel();
+  };
+  $("screenAr").onchange = function (e) { state.screenAr = e.target.value; updateMeta(); };
+
+  /* ---- output presets: name the destination, not the pixel count ---- */
+  var OUTPUTS = [
+    ["1920x1080", "Slides &amp; Slack", "16:9"],
+    ["1080x1080", "Square post", "1:1"],
+    ["1080x1350", "Portrait post", "4:5"],
+    ["1080x1920", "Story / Reel", "9:16"]
+  ];
+  var chipWrap = $("outputChips");
+  OUTPUTS.forEach(function (o) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = "chip"; b.dataset.dims = o[0];
+    b.innerHTML = o[1] + "<small>" + o[2] + " · " + o[0].replace("x", " × ") + "</small>";
+    b.onclick = function () { setCanvasSize(o[0]); };
+    chipWrap.appendChild(b);
+  });
+  function setCanvasSize(dims) {
+    var p = dims.split("x");
+    canvas.width = parseInt(p[0], 10); canvas.height = parseInt(p[1], 10);
+    brushPat = grainPat = null;
+    // keep the exact-size select and the chips agreeing with each other
+    if ($("preset").value !== dims &&
+        [].some.call($("preset").options, function (op) { return op.value === dims; })) {
+      $("preset").value = dims;
+    }
+    Array.prototype.forEach.call(chipWrap.children, function (el) {
+      el.setAttribute("aria-pressed", el.dataset.dims === dims ? "true" : "false");
+    });
+    updateMeta(); queueSave();
+  }
+  $("preset").onchange = function (e) { setCanvasSize(e.target.value); };
+  function bindRange(id, key, suffix) {
+    $(id).oninput = function (e) { state[key] = parseFloat(e.target.value); $(id + "V").textContent = e.target.value + (suffix || ""); };
+  }
+  bindRange("padding", "padding", "%");
+  bindRange("radius", "radius", "");
+  bindRange("shadow", "shadow", "");
+  $("theme").onchange = function (e) { state.theme = e.target.value; };
+  $("title").oninput = function (e) { state.title = e.target.value; };
+  $("fitCover").onchange = function (e) { state.cover = e.target.checked; };
+  $("reflect").onchange = function (e) { state.reflect = e.target.checked; };
+  $("backdrop").onchange = function (e) { state.backdrop = e.target.checked; };
+  $("grain").onchange = function (e) { state.grain = e.target.checked; };
+  $("notch").onchange = function (e) { state.notch = e.target.checked; };
+  $("loop").onchange = function (e) { video.loop = e.target.checked; };
+  $("play").onclick = function () {
+    if (video.paused) { video.play(); this.textContent = "Pause"; } else { video.pause(); this.textContent = "Play"; }
+  };
+  $("restart").onclick = function () { video.currentTime = 0; video.play(); $("play").textContent = "Pause"; };
+  /* ---- timeline: scrub on the track, drag either handle to trim ---- */
+  var tl = $("tl"), dragMode = null;
+  function secAt(clientX) {
+    var r = tl.getBoundingClientRect();
+    if (!r.width) return 0;
+    return Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * (video.duration || 0);
+  }
+  function scrubTo(sec) {
+    video.currentTime = Math.max(state.trimStart, Math.min(state.trimEnd, sec));
+  }
+  // Hit-test by proximity rather than by e.target: a 12px handle is a small target,
+  // and the two at the extremes sit right on the edge of the track.
+  var GRAB = 11;
+  tl.addEventListener("pointerdown", function (e) {
+    if (!hasClip()) return;
+    var x = e.clientX - tl.getBoundingClientRect().left;
+    var da = Math.abs(x - handleX(pct(state.trimStart)));
+    var db = Math.abs(x - handleX(pct(state.trimEnd)));
+    dragMode = (da <= GRAB || db <= GRAB) ? (da <= db ? "a" : "b") : "seek";
+    seeking = true;
+    tl.setPointerCapture(e.pointerId);
+    if (dragMode === "seek") scrubTo(secAt(e.clientX));
+    e.preventDefault();
+  });
+  tl.addEventListener("pointermove", function (e) {
+    if (!dragMode) return;
+    var s = secAt(e.clientX);
+    if (dragMode === "a") { setTrim("a", s); video.currentTime = state.trimStart; }
+    else if (dragMode === "b") { setTrim("b", s); video.currentTime = state.trimEnd; }
+    else scrubTo(s);
+    syncPlayhead();
+  });
+  ["pointerup", "pointercancel"].forEach(function (ev) {
+    tl.addEventListener(ev, function () { dragMode = null; seeking = false; });
+  });
+  // arrow keys nudge a handle; shift jumps a whole second
+  function nudge(which) {
+    return function (e) {
+      var dir = e.key === "ArrowLeft" ? -1 : e.key === "ArrowRight" ? 1 : 0;
+      if (!dir || !hasClip()) return;
+      var cur = which === "a" ? state.trimStart : state.trimEnd;
+      setTrim(which, cur + dir * (e.shiftKey ? 1 : 0.1));
+      video.currentTime = which === "a" ? state.trimStart : state.trimEnd;
+      e.preventDefault();
+    };
+  }
+  $("tlA").addEventListener("keydown", nudge("a"));
+  $("tlB").addEventListener("keydown", nudge("b"));
+  window.addEventListener("resize", syncTrimUI);   // handle positions are in px
+
+  $("trimSetA").onclick = function () { setTrim("a", video.currentTime); };
+  $("trimSetB").onclick = function () { setTrim("b", video.currentTime); };
+  $("trimReset").onclick = function () { resetTrim(); video.currentTime = 0; };
+  $("png").onclick = function () {
+    state.exporting = true; draw();
+    canvas.toBlob(function (blob) {
+      state.exporting = false;
+      triggerDownload(URL.createObjectURL(blob), "mockup-" + Date.now() + ".png");
+    }, "image/png");
+  };
+
+  /* ================= export ================= */
+
+  function setStatus(msg, isErr) {
+    var el = $("status"); el.textContent = msg || ""; el.className = "status" + (isErr ? " err" : "");
+  }
+  // H.264 has no alpha channel — in any browser, in any container. VP9 and VP8 in
+  // WebM do, and MediaRecorder preserves it (verified by recording a cleared canvas
+  // and reading the decoded corner back as rgba 0,0,0,0). So a transparent export
+  // has to leave the MP4 family entirely; preferring MP4 is what was silently
+  // flattening transparent clips onto black.
+  var MP4_MIMES = ['video/mp4;codecs="avc1.42E01E,mp4a.40.2"', 'video/mp4;codecs="avc1.4d002a"', 'video/mp4;codecs=avc1', "video/mp4"];
+  var ALPHA_MIMES = ['video/webm;codecs="vp9,opus"', "video/webm;codecs=vp9", 'video/webm;codecs="vp8,opus"', "video/webm;codecs=vp8", "video/webm"];
+  function firstSupported(list) {
+    for (var i = 0; i < list.length; i++) if (window.MediaRecorder && MediaRecorder.isTypeSupported(list[i])) return list[i];
+    return "";
+  }
+  function pickMime() {
+    if (state.transparent) return firstSupported(ALPHA_MIMES);
+    return firstSupported(MP4_MIMES) || firstSupported(ALPHA_MIMES);
+  }
+  // readyState drops below HAVE_CURRENT_DATA for the duration of every seek, so
+  // testing mediaEl() here would disable Export whenever a control was touched
+  // mid-seek — and nothing would ever re-enable it. A decoded duration is enough;
+  // seekTo() waits for a real frame before recording starts.
+  function canExport() {
+    if (src.kind === "video") return video.duration > 0 && isFinite(video.duration);
+    return !!mediaEl();
+  }
+  function syncExportLabel() {
+    var m = pickMime(), btn = $("export");
+    if (state.transparent) {
+      btn.textContent = m ? "Export transparent WebM" : "Transparent video not supported here";
+      btn.disabled = !m || !canExport();
+    } else {
+      btn.textContent = m.indexOf("mp4") > -1 ? "Export as MP4" : "Export as WebM";
+      btn.disabled = !canExport();
+    }
+    $("bgNote").innerHTML = state.transparent
+      ? (m ? "Transparent clips export as <b>WebM (VP9)</b> — no MP4 codec carries an alpha channel. " +
+             "Plays transparent in Chrome, Edge, Firefox and Figma; QuickTime and Keynote will not. PNG export is transparent everywhere."
+           : "This browser has no WebM encoder, so it cannot write a transparent video. PNG export is still transparent.")
+      : "";
+  }
+  function triggerDownload(url, name) {
+    var a = document.createElement("a");
+    a.href = url; a.download = name; a.rel = "noopener";
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { a.remove(); }, 1000);
+  }
+
+  var recorder = null, chunks = [], wasLooping = true, wasMuted = true, stillTimer = null;
+
+  // Seek, then resolve only once the frame at `t` has actually decoded. `seeked`
+  // alone is not enough — readyState can still be below HAVE_CURRENT_DATA, and a
+  // draw() at that moment paints an empty screen.
+  function seekTo(t, cb) {
+    var done = false;
+    function finish() { if (!done) { done = true; cb(); } }
+    function afterSeek() {
+      if (video.requestVideoFrameCallback) {
+        video.requestVideoFrameCallback(function () { finish(); });
+        setTimeout(function () { if (video.readyState >= 2) finish(); }, 400);
+      } else {
+        (function poll() { if (video.readyState >= 2) finish(); else setTimeout(poll, 30); })();
+      }
+    }
+    if (Math.abs(video.currentTime - t) < 0.02 && video.readyState >= 2) { afterSeek(); return; }
+    video.addEventListener("seeked", function once() { video.removeEventListener("seeked", once); afterSeek(); });
+    video.currentTime = t;
+  }
+
+  $("export").onclick = function () {
+    if (!canExport()) return;
+    if (!window.MediaRecorder) { setStatus("MediaRecorder isn't available in this browser.", true); return; }
+    var mime = pickMime(), fps = parseInt($("fps").value, 10);
+    var ext = mime.indexOf("mp4") > -1 ? "mp4" : "webm";
+    var isVid = src.kind === "video", stream;
+    try { stream = canvas.captureStream(fps); }
+    catch (err) { setStatus("Canvas capture failed: " + err.message, true); return; }
+
+    if (isVid && $("withAudio").checked) {
+      try {
+        wasMuted = video.muted; video.muted = false;
+        var vs = video.captureStream ? video.captureStream() : (video.mozCaptureStream ? video.mozCaptureStream() : null);
+        if (vs) vs.getAudioTracks().forEach(function (t) { stream.addTrack(t); });
+      } catch (e2) { console.warn("audio capture unavailable", e2); }
+    }
+    chunks = [];
+    try { recorder = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 12000000 } : undefined); }
+    catch (e3) { setStatus("Could not start recorder: " + e3.message, true); return; }
+
+    recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+    recorder.onerror = function (e) { setStatus("Recorder error: " + (e.error ? e.error.name : "unknown"), true); };
+    recorder.onstop = function () {
+      state.recording = false; state.exporting = false; stillLen = 0;
+      if (stillTimer) { clearTimeout(stillTimer); stillTimer = null; }
+      if (isVid) { video.loop = wasLooping; $("loop").checked = wasLooping; video.muted = wasMuted; }
+      $("export").style.display = ""; $("stop").style.display = "none";
+      $("bar").style.display = "none"; $("export").disabled = false;
+      var blob = new Blob(chunks, { type: (recorder.mimeType || mime || "video/webm").split(";")[0] });
+      var url = URL.createObjectURL(blob), name = "device-mockup-" + Date.now() + "." + ext;
+      triggerDownload(url, name);
+      $("dl").href = url; $("dl").download = name;
+      $("resultVideo").src = url;
+      $("resultMeta").textContent = name + " — " + (blob.size / 1048576).toFixed(1) + " MB · " +
+        canvas.width + "×" + canvas.height + " · " + fps + " fps · " + (recorder.mimeType || mime || "video/webm");
+      $("result").style.display = "block";
+      setStatus("Saved " + name + (ext !== "webm" ? ""
+        : state.transparent ? " — WebM, the only format that carries transparency"
+        : " (WebM — this browser has no MP4 encoder)"));
+    };
+
+    var began = function () {
+      recorder.start(200);
+      state.recording = true; state.exporting = true;
+      $("export").style.display = "none"; $("stop").style.display = "";
+      $("bar").style.display = "block"; $("bar").firstElementChild.style.width = "0%";
+      setStatus("Recording in real time… keep this tab visible.");
+    };
+
+    if (isVid) {
+      wasLooping = video.loop; video.loop = false; $("loop").checked = false;
+      video.pause();
+      // Park on the exact frame the clip starts at, wait until it has really decoded,
+      // paint it, and only then start the recorder. Previously the recorder started
+      // while the seek was still settling, so the first frame written to the file was
+      // whatever the canvas held mid-seek — which is how the empty "choose a file"
+      // screen ended up as the video's thumbnail.
+      seekTo(state.trimStart, function () {
+        draw();
+        began();
+        // tick() stops at the out-point precisely, but it only runs on animation
+        // frames — if those starve, the clip overruns. Backstop on wall-clock.
+        stillTimer = setTimeout(function () {
+          if (recorder && recorder.state !== "inactive") { video.pause(); recorder.stop(); }
+        }, (clipLen() + 0.75) * 1000);
+        video.play().then(function () { $("play").textContent = "Pause"; })
+                    .catch(function (err) {
+                      setStatus("Playback blocked: " + err.message, true);
+                      if (recorder && recorder.state !== "inactive") recorder.stop();
+                    });
+      });
+      video.onended = function () { if (recorder && recorder.state !== "inactive") setTimeout(function () { recorder.stop(); }, 250); };
+    } else {
+      stillLen = Math.max(1, Math.min(60, parseFloat($("stillSecs").value) || 5));
+      stillStart = Date.now();
+      draw(); began();
+      stillTimer = setTimeout(function () { if (recorder && recorder.state !== "inactive") recorder.stop(); }, stillLen * 1000);
+    }
+  };
+  $("stop").onclick = function () {
+    if (src.kind === "video") { video.pause(); $("play").textContent = "Play"; }
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+  };
+
+  /* ================= init ================= */
+
+  if (!window.MediaRecorder) setStatus("Heads up: MediaRecorder isn't supported here, so export won't work.", true);
+  setBg(state.bg);
+  setCanvasSize(canvas.width + "x" + canvas.height);
+  var savedMode = restoreSettings() || "quick";
+  $("device").onchange({ target: $("device") });
+  applyMode(savedMode);
+  syncExportLabel();
+  enable(false);
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
